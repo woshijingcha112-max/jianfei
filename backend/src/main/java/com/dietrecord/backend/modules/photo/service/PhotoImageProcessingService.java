@@ -2,6 +2,7 @@ package com.dietrecord.backend.modules.photo.service;
 
 import com.dietrecord.backend.config.AppProperties;
 import com.dietrecord.backend.modules.photo.model.internal.ProcessedPhoto;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,7 +26,11 @@ import java.util.Base64;
 import java.util.Iterator;
 import java.util.Locale;
 
+/**
+ * 图片压缩与格式规整服务。
+ */
 @Service
+@Slf4j
 public class PhotoImageProcessingService {
 
     private static final String DEFAULT_IMAGE_EXTENSION = "jpg";
@@ -45,6 +50,7 @@ public class PhotoImageProcessingService {
         try {
             originalBytes = file.getBytes();
         } catch (IOException ex) {
+            log.error("读取上传图片失败，文件名={}", file.getOriginalFilename(), ex);
             throw new IllegalStateException("failed to read uploaded file", ex);
         }
         if (originalBytes.length == 0) {
@@ -57,9 +63,13 @@ public class PhotoImageProcessingService {
         String originalFilename = file.getOriginalFilename();
         String originalFormat = resolveFormat(originalFilename, file.getContentType());
 
+        log.info("开始处理上传图片，文件名={}，原始大小={}字节，宽={}，高={}",
+                originalFilename, originalBytes.length, width, height);
+
         boolean withinSize = originalBytes.length <= appProperties.getPhoto().getImage().getPreserveMaxBytes();
         boolean withinDimension = Math.max(width, height) <= appProperties.getPhoto().getImage().getMaxDimension();
         if (withinSize && withinDimension) {
+            log.info("图片满足直传条件，无需压缩，文件名={}", originalFilename);
             return new ProcessedPhoto(
                     originalBytes,
                     originalFilename,
@@ -73,12 +83,14 @@ public class PhotoImageProcessingService {
             );
         }
 
+        // 先按最大边约束缩放，再根据目标大小继续递减尺寸。
         boolean hasAlpha = sourceImage.getColorModel().hasAlpha();
         BufferedImage resizedImage = resizeIfNeeded(sourceImage, appProperties.getPhoto().getImage().getMaxDimension());
         String outputFormat = chooseOutputFormat(originalFormat, hasAlpha);
         byte[] encodedBytes = encodeImage(resizedImage, outputFormat, appProperties.getPhoto().getImage().getJpegQuality());
         long targetMaxBytes = appProperties.getPhoto().getImage().getCompressedTargetMaxBytes();
 
+        // 当编码后体积仍超阈值时，继续逐步缩小尺寸，直到达到目标或触达下限。
         while (encodedBytes.length > targetMaxBytes && Math.max(resizedImage.getWidth(), resizedImage.getHeight()) > 640) {
             int nextWidth = Math.max(1, (int) Math.round(resizedImage.getWidth() * 0.85d));
             int nextHeight = Math.max(1, (int) Math.round(resizedImage.getHeight() * 0.85d));
@@ -88,6 +100,9 @@ public class PhotoImageProcessingService {
             resizedImage = resizeToExact(resizedImage, nextWidth, nextHeight);
             encodedBytes = encodeImage(resizedImage, outputFormat, appProperties.getPhoto().getImage().getJpegQuality());
         }
+
+        log.info("图片处理完成，文件名={}，输出格式={}，压缩后大小={}字节，宽={}，高={}",
+                originalFilename, outputFormat, encodedBytes.length, resizedImage.getWidth(), resizedImage.getHeight());
 
         return new ProcessedPhoto(
                 encodedBytes,
@@ -181,10 +196,8 @@ public class PhotoImageProcessingService {
                 } finally {
                     writer.dispose();
                 }
-            } else {
-                if (!ImageIO.write(image, format, outputStream)) {
-                    throw new IllegalStateException("image format is not supported: " + format);
-                }
+            } else if (!ImageIO.write(image, format, outputStream)) {
+                throw new IllegalStateException("image format is not supported: " + format);
             }
             return outputStream.toByteArray();
         } catch (IOException ex) {

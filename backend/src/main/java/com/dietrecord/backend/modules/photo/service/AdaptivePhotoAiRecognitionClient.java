@@ -8,8 +8,7 @@ import com.dietrecord.backend.modules.photo.model.internal.PhotoAiRecognitionCan
 import com.dietrecord.backend.modules.photo.model.internal.ProcessedPhoto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -27,20 +26,22 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * 自适应图片识别客户端实现。
+ */
 @Service
+@Slf4j
 public class AdaptivePhotoAiRecognitionClient implements PhotoAiRecognitionClient {
 
-    private static final Logger log = LoggerFactory.getLogger(AdaptivePhotoAiRecognitionClient.class);
-
     private static final String FIXED_PROMPT = """
-            你是减肥餐拍照识别助手。请根据图片识别餐食，并只输出严格 JSON 数组，不要输出 Markdown、解释或多余文字。
+            你是减肥饮食拍照识别助手。请根据图片识别餐食，并且只输出严格 JSON 数组，不要输出 Markdown、解释或多余文字。
             每个数组元素必须包含：
-            - foodName: 标准化中文食物名，尽量贴近菜单库常见名称
+            - foodName: 标准化中文食物名，尽量贴近菜品库常见名称
             - confidence: 0 到 1 的小数
-            - weightG: 估算克重，数字
-            - calories: 估算热量，数字，可为空
+            - weightG: 估算克重，数值
+            - calories: 估算热量，数值，可为空
             - tagColor: 可选，1=绿 2=橙 3=红
-            - matchedHint: 可选，能与菜单库匹配时填 true
+            - matchedHint: 可选，能与菜品库匹配时填 true
             如果看不清，请返回最有可能的候选，但不要编造过多项。
             示例：
             [{"foodName":"番茄炒蛋","confidence":0.92,"weightG":180,"calories":320,"tagColor":2,"matchedHint":true}]
@@ -64,32 +65,40 @@ public class AdaptivePhotoAiRecognitionClient implements PhotoAiRecognitionClien
 
     @Override
     public List<PhotoAiRecognitionCandidate> recognize(ProcessedPhoto processedPhoto) {
-        if (!appProperties.getPhoto().getAi().isEnabled()
-                || !StringUtils.hasText(appProperties.getPhoto().getAi().getProvider())
-                || !"duijieai".equalsIgnoreCase(appProperties.getPhoto().getAi().getProvider())) {
+        AppProperties.Ai aiProperties = appProperties.getPhoto().getAi();
+
+        // 当前只在显式启用且 provider 为 duijieai 时走真实外调。
+        if (!aiProperties.isEnabled()
+                || !StringUtils.hasText(aiProperties.getProvider())
+                || !"duijieai".equalsIgnoreCase(aiProperties.getProvider())) {
+            log.info("AI 外调未启用或 provider 不匹配，回退本地候选，文件名={}", processedPhoto.originalFilename());
             return fallbackRecognize(processedPhoto);
         }
 
         try {
             List<PhotoAiRecognitionCandidate> candidates = invokeAiPlatform(processedPhoto);
             if (!candidates.isEmpty()) {
+                log.info("AI 外调识别成功，文件名={}，候选数={}", processedPhoto.originalFilename(), candidates.size());
                 return candidates;
             }
-            log.warn("ai provider returned empty recognition result, falling back to local mock");
+            log.warn("AI 外调返回空结果，回退本地候选，文件名={}", processedPhoto.originalFilename());
         } catch (Exception ex) {
-            log.warn("ai provider recognition failed, falling back to local mock: {}", ex.getMessage());
+            log.warn("AI 外调识别失败，回退本地候选，文件名={}，原因={}",
+                    processedPhoto.originalFilename(), ex.getMessage());
         }
         return fallbackRecognize(processedPhoto);
     }
 
-    private List<PhotoAiRecognitionCandidate> invokeAiPlatform(ProcessedPhoto processedPhoto) throws IOException, InterruptedException {
+    private List<PhotoAiRecognitionCandidate> invokeAiPlatform(ProcessedPhoto processedPhoto)
+            throws IOException, InterruptedException {
         AppProperties.Ai aiProperties = appProperties.getPhoto().getAi();
         if (!StringUtils.hasText(aiProperties.getEndpoint()) || !StringUtils.hasText(aiProperties.getModel())) {
+            log.warn("AI 外调配置不完整，直接回退本地候选，endpoint={}，model={}",
+                    aiProperties.getEndpoint(), aiProperties.getModel());
             return fallbackRecognize(processedPhoto);
         }
 
-        // TODO: Replace the request contract below with the exact duijieai platform HTTP format.
-        // Keep this block isolated so the endpoint, headers and payload can be edited manually.
+        // 请求体、鉴权头和响应解析集中放在这里，方便后续按平台真实契约调整。
         String requestBody = buildRequestBody(aiProperties.getModel(), processedPhoto);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(aiProperties.getEndpoint()))
@@ -100,7 +109,8 @@ public class AdaptivePhotoAiRecognitionClient implements PhotoAiRecognitionClien
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8))
                 .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<String> response = httpClient.send(request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new IllegalStateException("ai platform returned status " + response.statusCode());
         }
@@ -149,7 +159,7 @@ public class AdaptivePhotoAiRecognitionClient implements PhotoAiRecognitionClien
             }
             return candidates;
         } catch (Exception ex) {
-            log.warn("failed to parse ai response, falling back to mock: {}", ex.getMessage());
+            log.warn("AI 响应解析失败，回退空候选等待上层处理，原因={}", ex.getMessage());
             return List.of();
         }
     }
@@ -159,10 +169,14 @@ public class AdaptivePhotoAiRecognitionClient implements PhotoAiRecognitionClien
         if (root == null) {
             return nodes;
         }
+
+        // 优先处理数组形态响应，兼容直接返回候选列表的场景。
         if (root.isArray()) {
             root.forEach(nodes::add);
             return nodes;
         }
+
+        // 再兼容常见包装字段，降低对具体平台返回结构的耦合。
         if (root.has("items") && root.get("items").isArray()) {
             root.get("items").forEach(nodes::add);
             return nodes;
@@ -175,6 +189,8 @@ public class AdaptivePhotoAiRecognitionClient implements PhotoAiRecognitionClien
             root.get("result").forEach(nodes::add);
             return nodes;
         }
+
+        // 最后兼容大模型 choices 包装，把文本中的 JSON 继续拆出来。
         if (root.has("choices") && root.get("choices").isArray()) {
             root.get("choices").forEach(choice -> {
                 JsonNode content = choice.path("message").path("content");
@@ -189,12 +205,13 @@ public class AdaptivePhotoAiRecognitionClient implements PhotoAiRecognitionClien
                             nodes.add(parsed);
                         }
                     } catch (Exception ignore) {
-                        // Keep parsing lenient for platform responses that wrap JSON in text.
+                        log.debug("choices 文本内容不是可解析 JSON，已忽略该片段");
                     }
                 }
             });
             return nodes;
         }
+
         if (root.isObject()) {
             nodes.add(root);
         }
@@ -236,7 +253,7 @@ public class AdaptivePhotoAiRecognitionClient implements PhotoAiRecognitionClien
                 try {
                     return new BigDecimal(field.asText().trim());
                 } catch (NumberFormatException ignore) {
-                    // continue
+                    log.debug("字段 {} 无法解析为小数，原值={}", fieldName, field.asText());
                 }
             }
         }
@@ -253,7 +270,7 @@ public class AdaptivePhotoAiRecognitionClient implements PhotoAiRecognitionClien
                 try {
                     return Integer.parseInt(field.asText().trim());
                 } catch (NumberFormatException ignore) {
-                    // continue
+                    log.debug("字段 {} 无法解析为整数，原值={}", fieldName, field.asText());
                 }
             }
         }
@@ -264,9 +281,11 @@ public class AdaptivePhotoAiRecognitionClient implements PhotoAiRecognitionClien
         List<FoodLibraryPO> foods = foodLibraryMapper.selectList(
                 new LambdaQueryWrapper<FoodLibraryPO>().orderByAsc(FoodLibraryPO::getId));
         if (foods.isEmpty()) {
+            log.warn("食物库为空，无法生成本地回退候选，文件名={}", processedPhoto.originalFilename());
             return List.of();
         }
 
+        // 使用图片指纹做稳定种子，保证同一张图在回退模式下结果尽量稳定。
         int candidateCount = Math.min(3, foods.size());
         long seed = decodeSeed(processedPhoto.sha256());
         int startIndex = (int) Math.floorMod(seed, foods.size());
@@ -282,6 +301,8 @@ public class AdaptivePhotoAiRecognitionClient implements PhotoAiRecognitionClien
                     null,
                     food.getTagColor()));
         }
+
+        log.info("本地回退候选生成完成，文件名={}，候选数={}", processedPhoto.originalFilename(), candidates.size());
         return candidates;
     }
 

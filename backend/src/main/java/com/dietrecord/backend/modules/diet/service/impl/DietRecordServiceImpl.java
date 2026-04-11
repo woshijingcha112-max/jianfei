@@ -11,6 +11,7 @@ import com.dietrecord.backend.modules.diet.model.po.DietRecordPO;
 import com.dietrecord.backend.modules.diet.model.vo.DietRecordCardVO;
 import com.dietrecord.backend.modules.diet.service.DietRecordService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -25,7 +26,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+/**
+ * 饮食记录服务实现。
+ */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class DietRecordServiceImpl implements DietRecordService {
 
@@ -40,6 +45,10 @@ public class DietRecordServiceImpl implements DietRecordService {
     public void save(DietRecordSaveDTO request) {
         LocalDateTime now = LocalDateTime.now();
 
+        log.info("开始保存饮食记录，日期={}，餐次={}，明细数={}",
+                request.recordDate(), request.mealType(), request.items().size());
+
+        // 先保存主记录，确保后续明细能拿到 recordId。
         DietRecordPO recordPO = new DietRecordPO();
         recordPO.setUserId(USER_ID);
         recordPO.setRecordDate(request.recordDate());
@@ -50,6 +59,7 @@ public class DietRecordServiceImpl implements DietRecordService {
         recordPO.setCreatedAt(now);
         dietRecordMapper.insert(recordPO);
 
+        // 再逐条保存饮食明细，保持记录与明细的一致性。
         for (DietRecordItemDTO item : request.items()) {
             DietItemPO itemPO = new DietItemPO();
             itemPO.setRecordId(recordPO.getId());
@@ -61,10 +71,15 @@ public class DietRecordServiceImpl implements DietRecordService {
             itemPO.setIsConfirmed(item.isConfirmed() == null ? 0 : item.isConfirmed());
             dietItemMapper.insert(itemPO);
         }
+
+        log.info("饮食记录保存完成，记录ID={}，明细数={}", recordPO.getId(), request.items().size());
     }
 
     @Override
     public List<DietRecordCardVO> list(DietRecordListDTO request) {
+        log.info("开始查询饮食记录列表，日期={}", request.date());
+
+        // 先按日期拉取主记录列表，保持首页展示顺序稳定。
         List<DietRecordPO> recordPOList = dietRecordMapper.selectList(
                 new LambdaQueryWrapper<DietRecordPO>()
                         .eq(DietRecordPO::getUserId, USER_ID)
@@ -73,9 +88,11 @@ public class DietRecordServiceImpl implements DietRecordService {
                         .orderByDesc(DietRecordPO::getId)
         );
         if (recordPOList.isEmpty()) {
+            log.info("饮食记录列表为空，日期={}", request.date());
             return List.of();
         }
 
+        // 再批量查询明细并按 recordId 分组，避免循环内重复查库。
         List<Long> recordIds = recordPOList.stream()
                 .map(DietRecordPO::getId)
                 .filter(Objects::nonNull)
@@ -86,9 +103,12 @@ public class DietRecordServiceImpl implements DietRecordService {
                 ).stream()
                 .collect(Collectors.groupingBy(DietItemPO::getRecordId));
 
-        return recordPOList.stream()
+        List<DietRecordCardVO> result = recordPOList.stream()
                 .map(recordPO -> toCardVO(recordPO, itemMap.getOrDefault(recordPO.getId(), List.of())))
                 .toList();
+
+        log.info("饮食记录列表查询完成，日期={}，记录数={}", request.date(), result.size());
+        return result;
     }
 
     private DietRecordCardVO toCardVO(DietRecordPO recordPO, List<DietItemPO> items) {

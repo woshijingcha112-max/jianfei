@@ -2,6 +2,7 @@ package com.dietrecord.backend.modules.photo.service;
 
 import com.dietrecord.backend.config.AppProperties;
 import com.dietrecord.backend.modules.photo.model.internal.ProcessedPhoto;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -13,7 +14,11 @@ import java.time.LocalDate;
 import java.util.Locale;
 import java.util.UUID;
 
+/**
+ * 图片落盘服务。
+ */
 @Service
+@Slf4j
 public class PhotoStorageService {
 
     private static final String DEFAULT_FOLDER = "photo";
@@ -40,16 +45,22 @@ public class PhotoStorageService {
         Path targetDirectory = Path.of(uploadRoot, DEFAULT_FOLDER, year, month, day);
         Path targetFile = targetDirectory.resolve(storedFileName);
 
+        log.info("开始保存处理后图片，目标路径={}", targetFile);
+
         try {
             Files.createDirectories(targetDirectory);
             Files.write(targetFile, photo.content());
         } catch (IOException ex) {
+            log.error("处理后图片保存失败，目标路径={}", targetFile, ex);
             throw new IllegalStateException("failed to store uploaded file", ex);
         }
 
-        return normalizeAccessPrefix(appProperties.getStorage().getAccessPrefix())
+        String accessUrl = normalizeAccessPrefix(appProperties.getStorage().getAccessPrefix())
                 + "/"
                 + String.join("/", DEFAULT_FOLDER, year, month, day, storedFileName);
+
+        log.info("处理后图片保存完成，访问地址={}", accessUrl);
+        return accessUrl;
     }
 
     public String store(MultipartFile file) {
@@ -67,16 +78,22 @@ public class PhotoStorageService {
         Path targetDirectory = Path.of(uploadRoot, DEFAULT_FOLDER, year, month, day);
         Path targetFile = targetDirectory.resolve(storedFileName);
 
+        log.info("开始保存原始上传文件，目标路径={}", targetFile);
+
         try {
             Files.createDirectories(targetDirectory);
             file.transferTo(targetFile);
         } catch (IOException ex) {
+            log.error("原始上传文件保存失败，目标路径={}", targetFile, ex);
             throw new IllegalStateException("failed to store uploaded file", ex);
         }
 
-        return normalizeAccessPrefix(appProperties.getStorage().getAccessPrefix())
+        String accessUrl = normalizeAccessPrefix(appProperties.getStorage().getAccessPrefix())
                 + "/"
                 + String.join("/", DEFAULT_FOLDER, year, month, day, storedFileName);
+
+        log.info("原始上传文件保存完成，访问地址={}", accessUrl);
+        return accessUrl;
     }
 
     private String buildStoredFileName(String originalFilename, String fileExtension) {

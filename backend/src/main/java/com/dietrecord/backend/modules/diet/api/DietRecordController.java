@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * 饮食记录相关接口。
+ */
 @RestController
 @RequestMapping("/diet/record")
 @RequiredArgsConstructor
@@ -23,17 +26,35 @@ public class DietRecordController {
 
     private final DietRecordService dietRecordService;
 
+    /**
+     * 保存饮食记录。
+     *
+     * @param request 饮食记录保存请求
+     * @return 保存结果
+     */
     @PostMapping("/save")
     public ApiResponse<Void> save(@Valid @RequestBody DietRecordSaveDTO request) {
         dietRecordService.save(request);
         return ApiResponse.success(null);
     }
 
+    /**
+     * 查询指定日期的饮食记录列表。
+     *
+     * @param request 饮食记录列表查询请求
+     * @return 记录卡片列表
+     */
     @PostMapping("/list")
     public ApiResponse<List<DietRecordCardVO>> list(@Valid @RequestBody DietRecordListDTO request) {
         return ApiResponse.success(dietRecordService.list(request));
     }
 
+    /**
+     * 删除饮食记录。
+     *
+     * @param request 饮食记录删除请求
+     * @return 当前轮次固定返回未实现
+     */
     @PostMapping("/delete")
     public ApiResponse<Void> delete(@Valid @RequestBody DietRecordDeleteDTO request) {
         return ApiResponse.fail(ApiCode.NOT_IMPLEMENTED,
