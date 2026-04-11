@@ -8,7 +8,16 @@ app:
   storage:
     upload-root: D:/data/diet-app/uploads
     access-prefix: /uploads
-  baidu-ai:
-    enabled: false
-    api-key: replace_me
-    secret-key: replace_me
+  photo:
+    image:
+      preserve-max-bytes: 1200000
+      compressed-target-max-bytes: 900000
+      max-dimension: 1920
+      jpeg-quality: 0.88
+    ai:
+      enabled: false
+      provider: duijieai
+      endpoint: https://replace-with-duijieai-endpoint
+      api-key: replace_me
+      model: replace_me
+      timeout-millis: 8000

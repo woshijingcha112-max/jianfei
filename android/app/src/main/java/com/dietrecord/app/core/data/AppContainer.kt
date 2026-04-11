@@ -1,6 +1,6 @@
 package com.dietrecord.app.core.data
 
-import android.content.res.AssetManager
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.dietrecord.app.core.network.ApiConfig
@@ -18,7 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 
 class AppContainer(
-    private val assets: AssetManager,
+    context: Context,
     private val baseUrl: String = ApiConfig.DEFAULT_BASE_URL,
     private val dispatchers: AppDispatchers = AppDispatchers()
 ) {
@@ -33,7 +33,6 @@ class AppContainer(
 
     val recognitionRepository: RecognitionRepository = RealRecognitionRepository(
         api = dietApiService,
-        assetManager = assets,
         scope = appScope,
         dispatchers = dispatchers
     )

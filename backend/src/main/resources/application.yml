@@ -33,8 +33,16 @@ app:
   storage:
     upload-root: ${UPLOAD_ROOT:D:/data/diet-app/uploads}
     access-prefix: ${UPLOAD_ACCESS_PREFIX:/uploads}
-  baidu-ai:
-    enabled: false
-    api-key: ${BAIDU_AI_API_KEY:}
-    secret-key: ${BAIDU_AI_SECRET_KEY:}
-    dish-url: https://aip.baidubce.com/rest/2.0/image-classify/v2/dish
+  photo:
+    image:
+      preserve-max-bytes: 1200000
+      compressed-target-max-bytes: 900000
+      max-dimension: 1920
+      jpeg-quality: 0.88
+    ai:
+      enabled: false
+      provider: duijieai
+      endpoint: https://replace-with-duijieai-endpoint
+      api-key: ${PHOTO_AI_API_KEY:}
+      model: replace-me
+      timeout-millis: 8000

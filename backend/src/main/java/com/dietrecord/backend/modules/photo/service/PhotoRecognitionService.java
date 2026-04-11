@@ -3,175 +3,129 @@ package com.dietrecord.backend.modules.photo.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dietrecord.backend.modules.food.mapper.FoodLibraryMapper;
 import com.dietrecord.backend.modules.food.model.po.FoodLibraryPO;
+import com.dietrecord.backend.modules.photo.model.internal.PhotoAiRecognitionCandidate;
+import com.dietrecord.backend.modules.photo.model.internal.ProcessedPhoto;
 import com.dietrecord.backend.modules.photo.model.vo.PhotoRecognitionItemVO;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 @Service
 public class PhotoRecognitionService {
 
+    private final PhotoAiRecognitionClient photoAiRecognitionClient;
     private final FoodLibraryMapper foodLibraryMapper;
 
-    public PhotoRecognitionService(FoodLibraryMapper foodLibraryMapper) {
+    public PhotoRecognitionService(PhotoAiRecognitionClient photoAiRecognitionClient,
+                                   FoodLibraryMapper foodLibraryMapper) {
+        this.photoAiRecognitionClient = photoAiRecognitionClient;
         this.foodLibraryMapper = foodLibraryMapper;
     }
 
-    public List<PhotoRecognitionItemVO> recognize(String sourceFilename) {
+    public List<PhotoRecognitionItemVO> recognize(ProcessedPhoto processedPhoto) {
+        List<PhotoAiRecognitionCandidate> candidates = photoAiRecognitionClient.recognize(processedPhoto);
         List<FoodLibraryPO> foods = foodLibraryMapper.selectList(
                 new LambdaQueryWrapper<FoodLibraryPO>().orderByAsc(FoodLibraryPO::getId));
-        if (foods.isEmpty()) {
-            return Collections.emptyList();
+        List<PhotoRecognitionItemVO> items = new ArrayList<>();
+        int index = 0;
+        for (PhotoAiRecognitionCandidate candidate : candidates) {
+            if (candidate == null || !StringUtils.hasText(candidate.foodName())) {
+                continue;
+            }
+            items.add(toItem(candidate, foods, index++));
         }
-
-        String normalizedSource = normalizeText(sourceFilename);
-        List<ScoredFood> rankedFoods = foods.stream()
-                .map(food -> new ScoredFood(food, score(food, normalizedSource)))
-                .sorted(Comparator.comparingInt(ScoredFood::score).reversed()
-                        .thenComparing(scoredFood -> scoredFood.food().getId()))
-                .limit(3)
-                .collect(Collectors.toList());
-
-        AtomicInteger index = new AtomicInteger();
-        return rankedFoods.stream()
-                .map(scoredFood -> toItem(scoredFood, index.getAndIncrement()))
-                .collect(Collectors.toList());
+        items.sort(Comparator.comparing(PhotoRecognitionItemVO::getConfidence, Comparator.nullsLast(Comparator.reverseOrder())));
+        return items;
     }
 
-    private PhotoRecognitionItemVO toItem(ScoredFood scoredFood, int rank) {
-        FoodLibraryPO food = scoredFood.food();
-        int score = scoredFood.score();
-        BigDecimal weightG = determineWeight(score, rank);
-        BigDecimal calories = calculateCalories(food.getCaloriesKcal(), weightG);
-        BigDecimal confidence = determineConfidence(score, rank);
+    public List<PhotoRecognitionItemVO> recognize(String sourceFilename) {
+        ProcessedPhoto fallbackPhoto = new ProcessedPhoto(
+                new byte[0],
+                sourceFilename,
+                "image/jpeg",
+                "jpg",
+                false,
+                0,
+                0,
+                0,
+                sourceFilename == null ? UUID.randomUUID().toString() : sourceFilename);
+        return recognize(fallbackPhoto);
+    }
 
+    private PhotoRecognitionItemVO toItem(PhotoAiRecognitionCandidate candidate, List<FoodLibraryPO> foods, int rank) {
+        FoodMatch match = findMatch(candidate.foodName(), foods);
+        BigDecimal confidence = candidate.confidence() != null
+                ? candidate.confidence().setScale(2, RoundingMode.HALF_UP)
+                : defaultConfidence(rank);
+        BigDecimal weightG = candidate.weightG() != null ? candidate.weightG().setScale(1, RoundingMode.HALF_UP) : defaultWeight(rank);
+
+        if (match != null) {
+            FoodLibraryPO food = match.food();
+            BigDecimal calories = calculateCalories(food.getCaloriesKcal(), weightG);
+            return new PhotoRecognitionItemVO(
+                    buildTempId(rank, food.getId(), food.getFoodName()),
+                    food.getId(),
+                    food.getFoodName(),
+                    calories,
+                    food.getTagColor(),
+                    Boolean.TRUE,
+                    confidence,
+                    weightG,
+                    Boolean.FALSE
+            );
+        }
+
+        BigDecimal calories = candidate.calories() != null ? candidate.calories().setScale(1, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
+        Integer tagColor = candidate.tagColor();
         return new PhotoRecognitionItemVO(
-                "tmp-" + UUID.randomUUID().toString().replace("-", "") + "-" + (rank + 1),
-                food.getId(),
-                food.getFoodName(),
+                buildTempId(rank, null, candidate.foodName()),
+                null,
+                candidate.foodName(),
                 calories,
-                food.getTagColor(),
-                Boolean.TRUE,
+                tagColor,
+                Boolean.FALSE,
                 confidence,
                 weightG,
                 Boolean.FALSE
         );
     }
 
-    private BigDecimal determineWeight(int score, int rank) {
-        long weight;
-        if (score >= 120) {
-            if (rank == 0) {
-                weight = 160L;
-            } else if (rank == 1) {
-                weight = 120L;
-            } else {
-                weight = 90L;
-            }
-        } else if (score >= 80) {
-            if (rank == 0) {
-                weight = 140L;
-            } else if (rank == 1) {
-                weight = 100L;
-            } else {
-                weight = 70L;
-            }
-        } else if (score > 0) {
-            if (rank == 0) {
-                weight = 120L;
-            } else if (rank == 1) {
-                weight = 90L;
-            } else {
-                weight = 60L;
-            }
-        } else {
-            if (rank == 0) {
-                weight = 110L;
-            } else if (rank == 1) {
-                weight = 80L;
-            } else {
-                weight = 60L;
-            }
+    private FoodMatch findMatch(String candidateName, List<FoodLibraryPO> foods) {
+        String normalizedCandidate = normalizeText(candidateName);
+        if (!StringUtils.hasText(normalizedCandidate)) {
+            return null;
         }
-        return BigDecimal.valueOf(weight);
+
+        return foods.stream()
+                .map(food -> new FoodMatch(food, score(food, normalizedCandidate)))
+                .filter(match -> match.score() > 0)
+                .max(Comparator.comparingInt(FoodMatch::score).thenComparing(match -> match.food().getId()))
+                .orElse(null);
     }
 
-    private BigDecimal determineConfidence(int score, int rank) {
-        double confidence;
-        if (score >= 120) {
-            if (rank == 0) {
-                confidence = 0.96d;
-            } else if (rank == 1) {
-                confidence = 0.91d;
-            } else {
-                confidence = 0.88d;
-            }
-        } else if (score >= 80) {
-            if (rank == 0) {
-                confidence = 0.90d;
-            } else if (rank == 1) {
-                confidence = 0.85d;
-            } else {
-                confidence = 0.80d;
-            }
-        } else if (score > 0) {
-            if (rank == 0) {
-                confidence = 0.82d;
-            } else if (rank == 1) {
-                confidence = 0.76d;
-            } else {
-                confidence = 0.72d;
-            }
-        } else {
-            if (rank == 0) {
-                confidence = 0.74d;
-            } else if (rank == 1) {
-                confidence = 0.68d;
-            } else {
-                confidence = 0.64d;
-            }
-        }
-        return BigDecimal.valueOf(confidence).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal calculateCalories(BigDecimal caloriesPer100g, BigDecimal weightG) {
-        if (caloriesPer100g == null) {
-            return BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
-        }
-        return caloriesPer100g
-                .multiply(weightG)
-                .divide(BigDecimal.valueOf(100), 1, RoundingMode.HALF_UP);
-    }
-
-    private int score(FoodLibraryPO food, String normalizedSource) {
-        if (!StringUtils.hasText(normalizedSource)) {
-            return 0;
-        }
-
+    private int score(FoodLibraryPO food, String normalizedCandidate) {
         int score = 0;
         String foodName = normalizeText(food.getFoodName());
-        if (StringUtils.hasText(foodName) && normalizedSource.contains(foodName)) {
+        if (StringUtils.hasText(foodName) && normalizedCandidate.contains(foodName)) {
             score += 100;
         }
 
         String foodNameEn = normalizeText(food.getFoodNameEn());
-        if (StringUtils.hasText(foodNameEn) && normalizedSource.contains(foodNameEn)) {
+        if (StringUtils.hasText(foodNameEn) && normalizedCandidate.contains(foodNameEn)) {
             score += 60;
         }
 
         if (StringUtils.hasText(food.getAlias())) {
             for (String alias : food.getAlias().split("[,，]")) {
                 String normalizedAlias = normalizeText(alias);
-                if (StringUtils.hasText(normalizedAlias) && normalizedSource.contains(normalizedAlias)) {
+                if (StringUtils.hasText(normalizedAlias) && normalizedCandidate.contains(normalizedAlias)) {
                     score += 80;
                     break;
                 }
@@ -179,7 +133,7 @@ public class PhotoRecognitionService {
         }
 
         String category = normalizeText(food.getCategory());
-        if (StringUtils.hasText(category) && normalizedSource.contains(category)) {
+        if (StringUtils.hasText(category) && normalizedCandidate.contains(category)) {
             score += 20;
         }
 
@@ -195,21 +149,26 @@ public class PhotoRecognitionService {
                 .replaceAll("[\\s_\\-./()\\[\\]{}]+", "");
     }
 
-    private static final class ScoredFood {
-        private final FoodLibraryPO food;
-        private final int score;
-
-        private ScoredFood(FoodLibraryPO food, int score) {
-            this.food = food;
-            this.score = score;
+    private BigDecimal calculateCalories(BigDecimal caloriesPer100g, BigDecimal weightG) {
+        if (caloriesPer100g == null) {
+            return BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
         }
+        return caloriesPer100g.multiply(weightG).divide(BigDecimal.valueOf(100), 1, RoundingMode.HALF_UP);
+    }
 
-        private FoodLibraryPO food() {
-            return food;
-        }
+    private BigDecimal defaultConfidence(int rank) {
+        return BigDecimal.valueOf(Math.max(0.55d, 0.78d - (rank * 0.05d))).setScale(2, RoundingMode.HALF_UP);
+    }
 
-        private int score() {
-            return score;
-        }
+    private BigDecimal defaultWeight(int rank) {
+        return BigDecimal.valueOf(Math.max(60L, 120L - (rank * 20L))).setScale(1, RoundingMode.HALF_UP);
+    }
+
+    private String buildTempId(int rank, Long foodId, String foodName) {
+        String base = (foodId == null ? "unknown" : foodId.toString()) + "-" + rank + "-" + java.util.Objects.toString(foodName, "null");
+        return "tmp-" + UUID.nameUUIDFromBytes(base.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private record FoodMatch(FoodLibraryPO food, int score) {
     }
 }

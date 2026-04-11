@@ -11,16 +11,21 @@ import java.util.List;
 public class PhotoService {
 
     private final PhotoStorageService photoStorageService;
+    private final PhotoImageProcessingService photoImageProcessingService;
     private final PhotoRecognitionService photoRecognitionService;
 
-    public PhotoService(PhotoStorageService photoStorageService, PhotoRecognitionService photoRecognitionService) {
+    public PhotoService(PhotoStorageService photoStorageService,
+                        PhotoImageProcessingService photoImageProcessingService,
+                        PhotoRecognitionService photoRecognitionService) {
         this.photoStorageService = photoStorageService;
+        this.photoImageProcessingService = photoImageProcessingService;
         this.photoRecognitionService = photoRecognitionService;
     }
 
     public PhotoUploadVO uploadAndRecognize(MultipartFile file) {
-        String photoUrl = photoStorageService.store(file);
-        List<PhotoRecognitionItemVO> recognizedItems = photoRecognitionService.recognize(file.getOriginalFilename());
+        var processedPhoto = photoImageProcessingService.process(file);
+        String photoUrl = photoStorageService.store(processedPhoto);
+        List<PhotoRecognitionItemVO> recognizedItems = photoRecognitionService.recognize(processedPhoto);
         return new PhotoUploadVO(photoUrl, recognizedItems);
     }
 }

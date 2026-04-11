@@ -1,6 +1,6 @@
 package com.dietrecord.app.data
 
-import android.content.res.AssetManager
+import java.io.File
 import com.dietrecord.app.core.data.AppDispatchers
 import com.dietrecord.app.core.model.DietRecordCardUiModel
 import com.dietrecord.app.core.model.FoodTagLevel
@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 
 interface GoalRepository {
     val goalFlow: StateFlow<GoalUiModel>
@@ -54,7 +54,7 @@ interface RecognitionRepository {
     val currentRecognitionFlow: StateFlow<List<RecognizedFoodUiModel>>
     val currentRecognitionSessionFlow: StateFlow<RecognitionSessionState>
 
-    suspend fun recognizeSamplePhoto(): List<RecognizedFoodUiModel>
+    suspend fun recognizeCapturedPhoto(photoFile: File): List<RecognizedFoodUiModel>
 
     suspend fun getCurrentRecognition(): List<RecognizedFoodUiModel>
 
@@ -155,7 +155,6 @@ class RealDietRecordRepository(
 
 class RealRecognitionRepository(
     private val api: DietApiService,
-    private val assetManager: AssetManager,
     private val scope: CoroutineScope,
     private val dispatchers: AppDispatchers
 ) : RecognitionRepository {
@@ -165,8 +164,8 @@ class RealRecognitionRepository(
         .map { it.toUiModels() }
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
-    override suspend fun recognizeSamplePhoto(): List<RecognizedFoodUiModel> = withContext(dispatchers.io) {
-        val response = api.uploadPhoto(buildSamplePhotoPart()).requireData()
+    override suspend fun recognizeCapturedPhoto(photoFile: File): List<RecognizedFoodUiModel> = withContext(dispatchers.io) {
+        val response = api.uploadPhoto(photoFile.toMultipartBodyPart()).requireData()
         val session = response.toSessionState()
         _sessionFlow.value = session
         session.toUiModels()
@@ -182,10 +181,14 @@ class RealRecognitionRepository(
         }
     }
 
-    private fun buildSamplePhotoPart(): MultipartBody.Part {
-        val bytes = assetManager.open("sample_meal.png").use { it.readBytes() }
-        val requestBody = bytes.toRequestBody("image/png".toMediaType())
-        return MultipartBody.Part.createFormData("file", "sample_meal.png", requestBody)
+    private fun File.toMultipartBodyPart(): MultipartBody.Part {
+        val mimeType = when (extension.lowercase()) {
+            "png" -> "image/png"
+            "webp" -> "image/webp"
+            else -> "image/jpeg"
+        }.toMediaType()
+        val requestBody = asRequestBody(mimeType)
+        return MultipartBody.Part.createFormData("file", name, requestBody)
     }
 
     private fun PhotoUploadVO.toSessionState(): RecognitionSessionState {

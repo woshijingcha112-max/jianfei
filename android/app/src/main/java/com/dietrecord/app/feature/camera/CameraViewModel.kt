@@ -3,6 +3,7 @@ package com.dietrecord.app.feature.camera
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dietrecord.app.data.RecognitionRepository
+import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,7 +29,7 @@ class CameraViewModel(
         )
     }
 
-    fun recognizeSamplePhoto() {
+    fun recognizeCapturedPhoto(photoFile: File) {
         viewModelScope.launch {
             if (_uiState.value.simulateNextFailure) {
                 _uiState.value = _uiState.value.copy(
@@ -46,7 +47,7 @@ class CameraViewModel(
             )
 
             runCatching {
-                recognitionRepository.recognizeSamplePhoto()
+                recognitionRepository.recognizeCapturedPhoto(photoFile)
             }.onSuccess {
                 _uiState.value = _uiState.value.copy(
                     isRecognizing = false,
@@ -59,6 +60,13 @@ class CameraViewModel(
                 )
             }
         }
+    }
+
+    fun reportError(message: String) {
+        _uiState.value = _uiState.value.copy(
+            errorMessage = message,
+            isRecognizing = false
+        )
     }
 
     fun onNavigationHandled() {

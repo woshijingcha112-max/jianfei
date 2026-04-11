@@ -9,6 +9,6 @@ class DietRecordApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        container = AppContainer(assets = assets)
+        container = AppContainer(context = applicationContext)
     }
 }

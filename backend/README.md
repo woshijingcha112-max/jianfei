@@ -28,3 +28,10 @@ mvn spring-boot:run
 ```powershell
 ..\scripts\use-local-jdk17.ps1
 ```
+
+## 图片上传与 AI
+
+- `/diet/photo/upload` 现在会先做真实图片读取；只有图片尺寸或体积超阈值时才压缩，然后再落盘并进入识别链路。
+- 默认 `app.photo.ai.enabled=false`，因此会走可运行的本地 fallback，不会阻塞主链路开发。
+- 固定提示词直接写在 `AdaptivePhotoAiRecognitionClient` 中，请按实际平台能力手动调整。
+- 要接 duijieai 平台时，只需要改 `backend/src/main/resources/application-local.yml` 里的 `app.photo.ai.*`，再把 `AdaptivePhotoAiRecognitionClient` 里的请求体、鉴权头和响应解析改成平台真实契约即可。

@@ -120,13 +120,14 @@ fun AppNavHost() {
                     val cameraUiState by cameraViewModel.uiState.collectAsState()
                     CameraScreen(
                         uiState = cameraUiState,
-                        onRecognize = cameraViewModel::recognizeSamplePhoto,
+                        onRecognize = cameraViewModel::recognizeCapturedPhoto,
                         onConsumeNavigation = {
                             cameraViewModel.onNavigationHandled()
                             navController.navigate(AppDestination.Recognize.route)
                         },
                         onToggleSimulateFailure = cameraViewModel::toggleSimulateNextFailure,
-                        onDismissError = cameraViewModel::clearError
+                        onDismissError = cameraViewModel::clearError,
+                        onCaptureError = cameraViewModel::reportError
                     )
                 }
                 composable(AppDestination.Recognize.route) {
