@@ -4,6 +4,7 @@
 *.log
 
 backend/target/
+backend/src/main/resources/application-local.yml
 
 android/.gradle/
 android/build/

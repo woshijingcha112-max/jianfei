@@ -55,7 +55,7 @@ class CameraViewModel(
             }.onFailure {
                 _uiState.value = _uiState.value.copy(
                     isRecognizing = false,
-                    errorMessage = "识别失败，请稍后再试。"
+                    errorMessage = "上传或识别失败，请稍后再试。"
                 )
             }
         }

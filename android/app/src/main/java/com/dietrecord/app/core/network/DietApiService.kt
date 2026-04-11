@@ -1,14 +1,13 @@
 package com.dietrecord.app.core.network
 
 import com.dietrecord.app.core.network.model.ApiEnvelope
-import com.dietrecord.app.core.network.model.DateRequest
-import com.dietrecord.app.core.network.model.DietRecordSaveRequest
-import com.dietrecord.app.core.network.model.FoodSearchRequest
-import com.dietrecord.app.core.network.model.GoalSaveRequest
-import com.dietrecord.app.core.network.model.IdRequest
-import com.dietrecord.app.core.network.model.PeriodRecordRequest
-import com.dietrecord.app.core.network.model.RecordIdRequest
-import com.dietrecord.app.core.network.model.WeightRecordRequest
+import com.dietrecord.app.core.network.model.DietDateDTO
+import com.dietrecord.app.core.network.model.DietRecordCardVO
+import com.dietrecord.app.core.network.model.DietRecordSaveDTO
+import com.dietrecord.app.core.network.model.GoalGetVO
+import com.dietrecord.app.core.network.model.GoalSaveDTO
+import com.dietrecord.app.core.network.model.PhotoUploadVO
+import com.dietrecord.app.core.network.model.TodayDietStatVO
 import okhttp3.MultipartBody
 import retrofit2.http.Body
 import retrofit2.http.Multipart
@@ -17,40 +16,22 @@ import retrofit2.http.Part
 
 interface DietApiService {
 
-    @Multipart
-    @POST("diet/photo/upload")
-    suspend fun uploadPhoto(@Part file: MultipartBody.Part): ApiEnvelope<Any>
-
-    @POST("diet/record/save")
-    suspend fun saveDietRecord(@Body request: DietRecordSaveRequest): ApiEnvelope<Any>
-
-    @POST("diet/record/list")
-    suspend fun listDietRecords(@Body request: DateRequest): ApiEnvelope<Any>
-
-    @POST("diet/record/delete")
-    suspend fun deleteDietRecord(@Body request: RecordIdRequest): ApiEnvelope<Any>
-
-    @POST("food/search")
-    suspend fun searchFood(@Body request: FoodSearchRequest): ApiEnvelope<Any>
-
-    @POST("food/detail")
-    suspend fun foodDetail(@Body request: IdRequest): ApiEnvelope<Any>
-
-    @POST("diet/stat/today")
-    suspend fun todayStat(@Body request: DateRequest): ApiEnvelope<Any>
-
     @POST("goal/get")
-    suspend fun getGoal(): ApiEnvelope<Any>
+    suspend fun getGoal(): ApiEnvelope<GoalGetVO>
 
     @POST("goal/save")
-    suspend fun saveGoal(@Body request: GoalSaveRequest): ApiEnvelope<Any>
+    suspend fun saveGoal(@Body request: GoalSaveDTO): ApiEnvelope<Void>
 
-    @POST("weight/record")
-    suspend fun saveWeight(@Body request: WeightRecordRequest): ApiEnvelope<Any>
+    @Multipart
+    @POST("diet/photo/upload")
+    suspend fun uploadPhoto(@Part file: MultipartBody.Part): ApiEnvelope<PhotoUploadVO>
 
-    @POST("period/record")
-    suspend fun savePeriod(@Body request: PeriodRecordRequest): ApiEnvelope<Any>
+    @POST("diet/record/save")
+    suspend fun saveDietRecord(@Body request: DietRecordSaveDTO): ApiEnvelope<Void>
 
-    @POST("period/list")
-    suspend fun listPeriods(): ApiEnvelope<Any>
+    @POST("diet/record/list")
+    suspend fun listDietRecords(@Body request: DietDateDTO): ApiEnvelope<List<DietRecordCardVO>>
+
+    @POST("diet/stat/today")
+    suspend fun todayStat(@Body request: DietDateDTO): ApiEnvelope<TodayDietStatVO>
 }

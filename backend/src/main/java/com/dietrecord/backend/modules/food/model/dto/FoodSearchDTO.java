@@ -1,8 +1,8 @@
-package com.dietrecord.backend.common.dto;
+package com.dietrecord.backend.modules.food.model.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
-public record FoodSearchRequest(
+public record FoodSearchDTO(
         @NotBlank(message = "keyword is required")
         String keyword
 ) {

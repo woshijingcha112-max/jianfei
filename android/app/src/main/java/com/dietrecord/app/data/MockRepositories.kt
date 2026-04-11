@@ -1,19 +1,33 @@
 package com.dietrecord.app.data
 
+import android.content.res.AssetManager
 import com.dietrecord.app.core.data.AppDispatchers
 import com.dietrecord.app.core.model.DietRecordCardUiModel
 import com.dietrecord.app.core.model.FoodTagLevel
 import com.dietrecord.app.core.model.GoalUiModel
 import com.dietrecord.app.core.model.HomeSummaryUiModel
 import com.dietrecord.app.core.model.RecognizedFoodUiModel
+import com.dietrecord.app.core.network.DietApiService
+import com.dietrecord.app.core.network.model.ApiEnvelope
+import com.dietrecord.app.core.network.model.DietDateDTO
+import com.dietrecord.app.core.network.model.DietRecordSaveDTO
+import com.dietrecord.app.core.network.model.GoalSaveDTO
+import com.dietrecord.app.core.network.model.PhotoUploadVO
+import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 
 interface GoalRepository {
     val goalFlow: StateFlow<GoalUiModel>
@@ -38,6 +52,7 @@ interface DietRecordRepository {
 
 interface RecognitionRepository {
     val currentRecognitionFlow: StateFlow<List<RecognizedFoodUiModel>>
+    val currentRecognitionSessionFlow: StateFlow<RecognitionSessionState>
 
     suspend fun recognizeSamplePhoto(): List<RecognizedFoodUiModel>
 
@@ -46,121 +61,65 @@ interface RecognitionRepository {
     suspend fun clearCurrentRecognition()
 }
 
-class MockSessionStore {
-    private val dateFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日")
-    private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-
-    private val _goalFlow = MutableStateFlow(
-        GoalUiModel(
-            currentWeightKg = 70.0,
-            targetWeightKg = 65.0,
-            dailyCalorieLimit = 1500
-        )
-    )
-    val goalFlow: StateFlow<GoalUiModel> = _goalFlow.asStateFlow()
-
-    private val _todayRecordsFlow = MutableStateFlow<List<DietRecordCardUiModel>>(emptyList())
-    val todayRecordsFlow: StateFlow<List<DietRecordCardUiModel>> = _todayRecordsFlow.asStateFlow()
-
-    private val _currentRecognitionFlow = MutableStateFlow<List<RecognizedFoodUiModel>>(emptyList())
-    val currentRecognitionFlow: StateFlow<List<RecognizedFoodUiModel>> = _currentRecognitionFlow.asStateFlow()
-
-    private var nextRecordId = 1L
-
-    fun todayLabel(date: LocalDate = LocalDate.now()): String = date.format(dateFormatter)
-
-    fun saveGoal(goal: GoalUiModel) {
-        _goalFlow.value = goal
-    }
-
-    fun setCurrentRecognition(items: List<RecognizedFoodUiModel>) {
-        _currentRecognitionFlow.value = items
-    }
-
-    fun clearCurrentRecognition() {
-        _currentRecognitionFlow.value = emptyList()
-    }
-
-    fun saveRecognizedRecord(
-        items: List<RecognizedFoodUiModel>,
-        timestamp: LocalDateTime
-    ) {
-        val summary = items.joinToString(separator = "、") { it.name }
-        val totalCalories = items.sumOf { it.calories }
-        val dominantTag = items.maxByOrNull { it.calories }?.tagLevel ?: FoodTagLevel.Balanced
-        val card = DietRecordCardUiModel(
-            id = nextRecordId++,
-            savedAt = timestamp.format(timeFormatter),
-            summary = summary,
-            totalCalories = totalCalories,
-            dominantTag = dominantTag
-        )
-        _todayRecordsFlow.value = listOf(card) + _todayRecordsFlow.value
-    }
-
-    fun sampleRecognition(): List<RecognizedFoodUiModel> {
-        return listOf(
-            RecognizedFoodUiModel(
-                id = 1L,
-                name = "鸡蛋",
-                calories = 144,
-                tagLevel = FoodTagLevel.Balanced
-            ),
-            RecognizedFoodUiModel(
-                id = 2L,
-                name = "番茄",
-                calories = 30,
-                tagLevel = FoodTagLevel.Light
-            ),
-            RecognizedFoodUiModel(
-                id = 3L,
-                name = "炒饭",
-                calories = 280,
-                tagLevel = FoodTagLevel.High
-            )
-        )
-    }
-}
-
-class MockGoalRepository(
-    private val store: MockSessionStore,
+class RealGoalRepository(
+    private val api: DietApiService,
+    private val scope: CoroutineScope,
     private val dispatchers: AppDispatchers
 ) : GoalRepository {
-    override val goalFlow: StateFlow<GoalUiModel> = store.goalFlow
+    private val _goalFlow = MutableStateFlow(defaultGoal())
+    override val goalFlow: StateFlow<GoalUiModel> = _goalFlow.asStateFlow()
+
+    init {
+        scope.launch {
+            runCatching { refreshGoal() }
+        }
+    }
 
     override suspend fun getGoal(): GoalUiModel = withContext(dispatchers.io) {
-        delay(150)
-        store.goalFlow.value
+        refreshGoal()
     }
 
     override suspend fun saveGoal(goal: GoalUiModel) {
         withContext(dispatchers.io) {
-            delay(250)
-            store.saveGoal(goal)
+            api.saveGoal(goal.toSaveDTO()).ensureSuccess()
+            refreshGoal()
         }
+    }
+
+    private suspend fun refreshGoal(): GoalUiModel {
+        val goal = api.getGoal().requireData().toUiModel()
+        _goalFlow.value = goal
+        return goal
     }
 }
 
-class MockDietRecordRepository(
-    private val store: MockSessionStore,
+class RealDietRecordRepository(
+    private val api: DietApiService,
+    private val recognitionRepository: RecognitionRepository,
+    private val scope: CoroutineScope,
     private val dispatchers: AppDispatchers
 ) : DietRecordRepository {
-    override val todayRecordsFlow: StateFlow<List<DietRecordCardUiModel>> = store.todayRecordsFlow
+    private val _todayRecordsFlow = MutableStateFlow<List<DietRecordCardUiModel>>(emptyList())
+    override val todayRecordsFlow: StateFlow<List<DietRecordCardUiModel>> = _todayRecordsFlow.asStateFlow()
+
+    init {
+        scope.launch {
+            runCatching { refreshTodayRecords(LocalDate.now()) }
+        }
+    }
 
     override suspend fun getTodaySummary(date: LocalDate): HomeSummaryUiModel = withContext(dispatchers.io) {
-        delay(120)
-        val records = store.todayRecordsFlow.value
+        val stat = api.todayStat(DietDateDTO(date.toString())).requireData()
         HomeSummaryUiModel(
-            dateLabel = store.todayLabel(date),
-            consumedCalories = records.sumOf { it.totalCalories },
-            targetCalories = store.goalFlow.value.dailyCalorieLimit,
-            records = records
+            dateLabel = stat.dateLabel,
+            consumedCalories = stat.consumedCalories,
+            targetCalories = stat.targetCalories,
+            records = todayRecordsFlow.value
         )
     }
 
     override suspend fun listTodayRecords(date: LocalDate): List<DietRecordCardUiModel> = withContext(dispatchers.io) {
-        delay(80)
-        store.todayRecordsFlow.value
+        refreshTodayRecords(date)
     }
 
     override suspend fun saveRecognizedRecord(
@@ -168,32 +127,144 @@ class MockDietRecordRepository(
         timestamp: LocalDateTime
     ) {
         withContext(dispatchers.io) {
-            delay(300)
-            store.saveRecognizedRecord(items, timestamp)
+            val session = recognitionRepository.currentRecognitionSessionFlow.value
+            if (session.photoUrl.isBlank()) {
+                throw IllegalStateException("photoUrl is required before saving diet record")
+            }
+
+            val saveRequest = DietRecordSaveDTO(
+                recordDate = timestamp.toLocalDate().toString(),
+                mealType = 2,
+                photoUrl = session.photoUrl,
+                items = session.toSaveRequestItems().ifEmpty { items.toSaveRequestItemsFallback() }
+            )
+
+            api.saveDietRecord(saveRequest).ensureSuccess()
+            refreshTodayRecords(timestamp.toLocalDate())
         }
+    }
+
+    private suspend fun refreshTodayRecords(date: LocalDate): List<DietRecordCardUiModel> {
+        val records = api.listDietRecords(DietDateDTO(date.toString())).requireData().map { it.toUiModel() }
+        if (date == LocalDate.now()) {
+            _todayRecordsFlow.value = records
+        }
+        return records
     }
 }
 
-class MockRecognitionRepository(
-    private val store: MockSessionStore,
+class RealRecognitionRepository(
+    private val api: DietApiService,
+    private val assetManager: AssetManager,
+    private val scope: CoroutineScope,
     private val dispatchers: AppDispatchers
 ) : RecognitionRepository {
-    override val currentRecognitionFlow: StateFlow<List<RecognizedFoodUiModel>> = store.currentRecognitionFlow
+    private val _sessionFlow = MutableStateFlow(RecognitionSessionState())
+    override val currentRecognitionSessionFlow: StateFlow<RecognitionSessionState> = _sessionFlow.asStateFlow()
+    override val currentRecognitionFlow: StateFlow<List<RecognizedFoodUiModel>> = _sessionFlow
+        .map { it.toUiModels() }
+        .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     override suspend fun recognizeSamplePhoto(): List<RecognizedFoodUiModel> = withContext(dispatchers.io) {
-        delay(350)
-        val items = store.sampleRecognition()
-        store.setCurrentRecognition(items)
-        items
+        val response = api.uploadPhoto(buildSamplePhotoPart()).requireData()
+        val session = response.toSessionState()
+        _sessionFlow.value = session
+        session.toUiModels()
     }
 
     override suspend fun getCurrentRecognition(): List<RecognizedFoodUiModel> = withContext(dispatchers.io) {
-        store.currentRecognitionFlow.value
+        currentRecognitionFlow.value
     }
 
     override suspend fun clearCurrentRecognition() {
         withContext(dispatchers.io) {
-            store.clearCurrentRecognition()
+            _sessionFlow.value = RecognitionSessionState()
         }
+    }
+
+    private fun buildSamplePhotoPart(): MultipartBody.Part {
+        val bytes = assetManager.open("sample_meal.png").use { it.readBytes() }
+        val requestBody = bytes.toRequestBody("image/png".toMediaType())
+        return MultipartBody.Part.createFormData("file", "sample_meal.png", requestBody)
+    }
+
+    private fun PhotoUploadVO.toSessionState(): RecognitionSessionState {
+        return RecognitionSessionState(
+            photoUrl = photoUrl,
+            recognizedItems = recognizedItems.map { it.toSessionItem() }
+        )
+    }
+}
+
+private fun defaultGoal(): GoalUiModel {
+    return GoalUiModel(
+        currentWeightKg = 70.0,
+        targetWeightKg = 65.0,
+        dailyCalorieLimit = 1500
+    )
+}
+
+private fun GoalUiModel.toSaveDTO(): GoalSaveDTO {
+    return GoalSaveDTO(
+        targetWeight = BigDecimal.valueOf(targetWeightKg),
+        dailyCalLimit = dailyCalorieLimit
+    )
+}
+
+private fun com.dietrecord.app.core.network.model.GoalGetVO.toUiModel(): GoalUiModel {
+    return GoalUiModel(
+        currentWeightKg = currentWeightKg.toDouble(),
+        targetWeightKg = targetWeightKg.toDouble(),
+        dailyCalorieLimit = dailyCalorieLimit
+    )
+}
+
+private fun ApiEnvelope<*>.ensureSuccess() {
+    if (code != 0) {
+        throw IllegalStateException(msg.ifBlank { "request failed" })
+    }
+}
+
+private fun <T> ApiEnvelope<T>.requireData(): T {
+    ensureSuccess()
+    return data ?: throw IllegalStateException(msg.ifBlank { "empty response data" })
+}
+
+private fun com.dietrecord.app.core.network.model.DietRecordCardVO.toUiModel(): DietRecordCardUiModel {
+    return DietRecordCardUiModel(
+        id = id,
+        savedAt = savedAt,
+        summary = summary,
+        totalCalories = totalCalories,
+        dominantTag = dominantTag.toFoodTagLevel()
+    )
+}
+
+private fun Int.toFoodTagLevel(): com.dietrecord.app.core.model.FoodTagLevel {
+    return when (this) {
+        1 -> com.dietrecord.app.core.model.FoodTagLevel.Light
+        3 -> com.dietrecord.app.core.model.FoodTagLevel.High
+        else -> com.dietrecord.app.core.model.FoodTagLevel.Balanced
+    }
+}
+
+private fun List<RecognizedFoodUiModel>.toSaveRequestItemsFallback(): List<com.dietrecord.app.core.network.model.DietRecordItemDTO> {
+    return map { item ->
+        com.dietrecord.app.core.network.model.DietRecordItemDTO(
+            foodId = item.id,
+            foodName = item.name,
+            weightG = null,
+            calories = BigDecimal.valueOf(item.calories.toLong()),
+            tagColor = item.tagLevel.toTagColor(),
+            isConfirmed = 1
+        )
+    }
+}
+
+private fun FoodTagLevel.toTagColor(): Int {
+    return when (this) {
+        FoodTagLevel.Light -> 1
+        FoodTagLevel.High -> 3
+        FoodTagLevel.Balanced -> 2
     }
 }

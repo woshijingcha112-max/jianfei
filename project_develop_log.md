@@ -2,14 +2,170 @@
 
 ## 当前摘要
 
-- 当前阶段：前端 mock MVP 首页优先 UI 完善已完成，继续维持 mock 主链路
+- 当前阶段：首页主链路最小真实化已完成代码落地与后端接口实调，待安卓端手工联调
 - 最近一次更新时间：2026-04-11
-- 当前总体状态：前后端基础骨架、本地开发环境、最小 harness 控制层与安卓 mock MVP 已落地；首页已完成少女粉主视觉收口，拍照/识别结果/目标页已完成基础统一风格，但后端业务能力仍未开始真实实现
-- 当前最关键未收口项 1：第 2 批食物库与菜品明细尚未进入实体/Mapper/Service/真实查询实现
-- 当前最关键未收口项 2：后端数据源与 MyBatis-Plus 自动装配仍处于临时关闭状态
-- 当前最关键未收口项 3：安卓端当前为 mock 链路，尚未替换为真实后端接口能力
+- 当前总体状态：前后端基础骨架、本地开发环境、最小 harness 控制层与首页主链路最小真实化代码均已落地；共享数据库 `dev_cse_finance` 已按修正后的 `schema.sql` 初始化，后端已完成真实启动与 6 个接口 smoke test，安卓端已由真实 repository 驱动
+- 当前最关键未收口项 1：安卓端未完成模拟器/真机手工回归
+- 当前最关键未收口项 2：本轮 smoke test 已向共享库写入测试饮食记录，尚未提供清理能力
+- 当前最关键未收口项 3：真实百度识别、搜索、体重记录仍未纳入本轮
 
 ## 开发日志
+
+### 2026-04-11 / 共享库初始化与后端接口实调
+
+#### 本次主要完成内容
+
+- 已修正后端联调阶段暴露的两个配置问题：
+  - `MybatisPlusConfiguration` 的 `@MapperScan` 范围从整个 `modules` 收紧到各模块 `mapper` 包，避免把 Service 接口错误注册为 Mapper
+  - `application.yml` 增加 `spring.sql.init.schema-locations=classpath:db/schema.sql`
+- 已修正共享库种子数据回写缺口：
+  - `schema.sql` 的 `food_library` upsert 新增 `food_name = VALUES(food_name)`，使重复初始化时能修正已存在种子中文名
+  - `application.yml` 增加 `spring.sql.init.encoding=UTF-8`
+- 已使用 `local` 配置连接共享库 `dev_cse_finance` 并通过 `spring.sql.init.mode=always` 执行最小表基线初始化
+- 已完成后端真实启动与接口 smoke test：
+  - `POST /goal/get`
+  - `POST /goal/save`
+  - `POST /diet/photo/upload`
+  - `POST /diet/record/save`
+  - `POST /diet/record/list`
+  - `POST /diet/stat/today`
+- 已确认最终 smoke test 结果：
+  - `goal/get` 与 `goal/save` 返回 `code = 0`
+  - 上传接口返回真实 `photoUrl`，识别项中文名已恢复为 `鸡蛋 / 番茄 / 炒饭`
+  - 保存记录成功后，列表最新摘要为 `鸡蛋、番茄、炒饭`
+  - 今日汇总返回 `consumedCalories = 858`、`targetCalories = 1500`
+
+#### 本次未完成内容
+
+- 未执行安卓端模拟器/真机手工回归
+- 未提供共享库中 smoke test 饮食记录的清理能力
+- 未接入真实百度识别、搜索页、删除记录、体重记录与生理期能力
+
+#### 本次暴露的缺陷或偏差
+
+- 共享库 smoke test 会产生真实测试记录，本轮因删除接口不在范围内，只能接受写入痕迹
+- 后端本地启动和接口实调已完成，但仍未覆盖安卓端实际页面跳转与交互链路
+
+#### 这些缺陷 / 未完成项将在第几步收口
+
+- 下一步：安卓端执行一次端到端手工联调，确认首页、拍照、识别结果和目标页的真实接口状态一致
+- 后续能力轮次：补删除记录或测试数据清理能力，再继续真实 AI 与搜索
+
+#### 是否需要更新 spec
+
+- 否
+
+#### 备注
+
+- 本轮接口 smoke test 使用的是共享库 `dev_cse_finance`
+- 本轮 smoke test 保持了目标配置原值回写，但新增了 3 条今日饮食记录用于验证保存、列表和汇总
+
+### 2026-04-11 / 首页主链路最小真实化落地
+
+#### 本次主要完成内容
+
+- 已完成后端首页主链路最小真实化：
+  - 恢复单数据源与 MyBatis-Plus 自动装配
+  - 新增 `AppProperties`、上传静态资源映射与固定 `user_id = 1` 配置
+  - 重写最小表基线 `user_profile`、`diet_record`、`diet_item`、`food_library`
+  - 落地 `UserProfilePO`、`DietRecordPO`、`DietItemPO`、`FoodLibraryPO` 及对应 Mapper
+  - 清退 `common/dto` 业务模型，改为模块内聚的 `DTO / VO / PO`
+- 已完成后端真实接口实现：
+  - `POST /goal/get`
+  - `POST /goal/save`
+  - `POST /diet/photo/upload`
+  - `POST /diet/record/save`
+  - `POST /diet/record/list`
+  - `POST /diet/stat/today`
+- 已完成安卓端真实接口替换：
+  - `DietApiService` 改为 6 个强类型真实接口
+  - `RealGoalRepository`、`RealDietRecordRepository`、`RealRecognitionRepository` 已替换旧 mock 语义
+  - 首页总览已固定使用 `/diet/stat/today`
+  - 目标页已改为真实读取与保存，当前体重只读展示
+  - 拍照页已改为“示例 `sample_meal.png` 资源 -> multipart 上传 -> 后端返回识别结果”
+  - 识别结果页保存后可通过真实接口刷新首页
+- 已完成本轮机械验证：
+  - 安卓 `:app:assembleDebug` 通过
+  - 后端 `scripts/backend-mvn.ps1 -DskipTests compile` 通过
+  - `scripts/verify-baseline.ps1` 通过
+
+#### 本次未完成内容
+
+- 未把 `schema.sql` 实际初始化到共享库 `dev_cse_finance`
+- 未执行带共享库连接的后端启动与接口实调
+- 未做模拟器/真机手工联调回归
+- 未接入真实百度识别、搜索页、删除记录、体重记录与生理期能力
+
+#### 本次暴露的缺陷或偏差
+
+- 本轮虽已完成代码和构建层收口，但共享数据库是否已具备新表基线尚未确认，不能把远端联调视为完成
+- 示例上传资源已改为真实 `png` 资源，但目前仍是占位样例图，视觉上不是正式食物照片
+- 后端识别结果当前仍由最小食物种子 mock 生成，接口契约虽已预留扩展字段，但真实 AI 匹配尚未验证
+
+#### 这些缺陷 / 未完成项将在第几步收口
+
+- 下一轮联调收口：先初始化 `schema.sql` 到共享库，再启动后端并验证 6 个真实接口
+- 联调通过后：补安卓端最小手工回归，确认“首页 -> 拍照 -> 识别结果 -> 保存 -> 首页刷新”整链路
+- 后续业务轮次：再接真实百度识别、搜索页与体重记录
+
+#### 是否需要更新 spec
+
+- 否
+
+#### 备注
+
+- 本轮严格控制在首页主链路最小真实化范围内，没有扩展 `food/search`、`food/detail`、`diet/record/delete`、`weight/record`、`period/*`、CameraX 与真实百度外调
+- 数据库真实密码仍只保留在本地忽略文件 `backend/src/main/resources/application-local.yml`，未进入仓库跟踪
+
+### 2026-04-11 / 首页主链路最小真实化边界切换
+
+#### 本次主要完成内容
+
+- 已确认本轮执行目标从“前端 mock 视觉维护”切换到“首页主链路最小真实化”：
+  - 首页总览真值固定由 `/diet/stat/today` 提供
+  - 拍照页继续保留示例上传入口，不接 CameraX
+  - 识别结果本轮仍由后端 mock，不调用真实百度接口
+- 已确认本轮只做以下真实接口范围：
+  - `POST /goal/get`
+  - `POST /goal/save`
+  - `POST /diet/photo/upload`
+  - `POST /diet/record/save`
+  - `POST /diet/record/list`
+  - `POST /diet/stat/today`
+- 已确认后端命名规范切换为：
+  - 持久化对象统一 `PO`
+  - 请求参数统一 `DTO`
+  - 响应结果统一 `VO`
+  - `BO` 仅在确有复杂内部聚合时才允许新增
+- 已确认数据库命名基线切换为无 `t_` 前缀：
+  - `user_profile`
+  - `diet_record`
+  - `diet_item`
+  - `food_library`
+
+#### 本次未完成内容
+
+- 真实接口、真实数据源、安卓真实仓储替换仍未落地
+- `feature_status.md` 仍未更新为本轮实现后的最终真值
+
+#### 本次暴露的缺陷或偏差
+
+- 当前 `spec.md` 仍禁止真实接口替换与后端联调，必须先改边界再动代码
+- 当前后端接口契约和安卓网络模型都还是 mock 阶段形态，直接并行开发会互相踩踏
+
+#### 这些缺陷 / 未完成项将在第几步收口
+
+- 本轮实施第一步：重写 `spec.md` 当前软规范
+- 本轮实施收口阶段：完成代码后回写 `feature_status.md` 真值并补完整开发记录
+
+#### 是否需要更新 spec
+
+- 是
+
+#### 备注
+
+- 本轮属于从 mock UI 阶段切换到首页主链路最小真实化，不做搜索、删除记录、体重记录、生理期、CameraX 与真实百度外调
+- 数据库继续按单用户 MVP 约束处理，固定 `user_id = 1`
 
 ### 2026-04-11 / 首页返回与拍照页闪退修复
 

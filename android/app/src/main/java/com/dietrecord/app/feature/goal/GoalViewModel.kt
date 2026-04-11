@@ -28,13 +28,21 @@ class GoalViewModel(
 
     init {
         viewModelScope.launch {
-            val goal = goalRepository.getGoal()
-            _uiState.value = _uiState.value.copy(
-                currentWeightInput = goal.currentWeightKg.stripZero(),
-                targetWeightInput = goal.targetWeightKg.stripZero(),
-                dailyLimitInput = goal.dailyCalorieLimit.toString(),
-                isLoading = false
-            )
+            runCatching {
+                goalRepository.getGoal()
+            }.onSuccess { goal ->
+                _uiState.value = _uiState.value.copy(
+                    currentWeightInput = goal.currentWeightKg.stripZero(),
+                    targetWeightInput = goal.targetWeightKg.stripZero(),
+                    dailyLimitInput = goal.dailyCalorieLimit.toString(),
+                    isLoading = false
+                )
+            }.onFailure {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "目标数据加载失败，请稍后再试。"
+                )
+            }
         }
     }
 
@@ -59,12 +67,11 @@ class GoalViewModel(
     }
 
     fun saveGoal() {
-        val currentWeight = _uiState.value.currentWeightInput.toDoubleOrNull()
         val targetWeight = _uiState.value.targetWeightInput.toDoubleOrNull()
         val dailyLimit = _uiState.value.dailyLimitInput.toIntOrNull()
 
-        if (currentWeight == null || targetWeight == null || dailyLimit == null) {
-            _uiState.value = _uiState.value.copy(errorMessage = "请输入有效的体重和热量数字。")
+        if (targetWeight == null || dailyLimit == null) {
+            _uiState.value = _uiState.value.copy(errorMessage = "请输入有效的目标体重和热量数字。")
             return
         }
         if (dailyLimit <= 0) {
@@ -86,7 +93,7 @@ class GoalViewModel(
             runCatching {
                 goalRepository.saveGoal(
                     GoalUiModel(
-                        currentWeightKg = currentWeight,
+                        currentWeightKg = _uiState.value.currentWeightInput.toDoubleOrNull() ?: 0.0,
                         targetWeightKg = targetWeight,
                         dailyCalorieLimit = dailyLimit
                     )

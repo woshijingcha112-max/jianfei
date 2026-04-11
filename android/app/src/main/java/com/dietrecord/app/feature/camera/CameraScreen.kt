@@ -58,18 +58,18 @@ fun CameraScreen(
     ) {
         AppPageHeader(
             title = "拍照识别",
-            subtitle = "保持当前结构，只把标题区、示意图容器和按钮换成同一套奶油粉语言。",
-            badgeText = "MOCK"
+            subtitle = "继续使用示例餐图，但现在会真实上传到后端识别接口。",
+            badgeText = "REAL"
         )
 
         SampleMealPreview(modifier = Modifier.fillMaxWidth())
 
         AppSectionCard(
             eyebrow = "当前链路",
-            title = "示例餐图会直接进入 mock 识别"
+            title = "示例餐图会上传后端并返回识别结果"
         ) {
             Text(
-                text = "这轮不接 CameraX，也不改现有流程。点击主按钮后，会直接生成固定识别结果并进入结果页。",
+                text = "这轮不接 CameraX。点击主按钮后，会把示例餐图提交给后端 `/diet/photo/upload`，再进入结果页。",
                 style = MaterialTheme.typography.bodyLarge,
                 color = CocoaBrown.copy(alpha = 0.74f)
             )
@@ -89,7 +89,7 @@ fun CameraScreen(
             onClick = onRecognize,
             enabled = !uiState.isRecognizing,
             modifier = Modifier.fillMaxWidth(),
-            supportingText = "继续保留 MVP 最小链路，不额外扩展交互。",
+            supportingText = "保留 MVP 最小交互，直接验证真实上传和识别链路。",
             badgeText = "识"
         )
 
@@ -283,7 +283,7 @@ private fun SampleMealPreview(
                 contentColor = CocoaBrown
             )
             Text(
-                text = "当前只用于触发 mock 识别流程",
+                text = "当前只用于触发真实上传与识别流程",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = CocoaBrown,

@@ -21,11 +21,20 @@ object ApiConfig {
         .addInterceptor(loggingInterceptor)
         .build()
 
-    private val retrofit: Retrofit = Retrofit.Builder()
-        .baseUrl(DEFAULT_BASE_URL)
-        .client(okHttpClient)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
+    private fun buildRetrofit(baseUrl: String): Retrofit {
+        val normalizedBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        return Retrofit.Builder()
+            .baseUrl(normalizedBaseUrl)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
 
-    val dietApiService: DietApiService = retrofit.create(DietApiService::class.java)
+    fun createDietApiService(baseUrl: String = DEFAULT_BASE_URL): DietApiService {
+        return buildRetrofit(baseUrl).create(DietApiService::class.java)
+    }
+
+    val dietApiService: DietApiService by lazy {
+        createDietApiService()
+    }
 }

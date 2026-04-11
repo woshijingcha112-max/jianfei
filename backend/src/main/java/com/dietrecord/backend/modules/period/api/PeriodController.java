@@ -2,7 +2,7 @@ package com.dietrecord.backend.modules.period.api;
 
 import com.dietrecord.backend.common.api.ApiCode;
 import com.dietrecord.backend.common.api.ApiResponse;
-import com.dietrecord.backend.common.dto.PeriodRecordRequest;
+import com.dietrecord.backend.modules.period.model.dto.PeriodRecordDTO;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PeriodController {
 
     @PostMapping("/record")
-    public ApiResponse<Void> record(@Valid @RequestBody PeriodRecordRequest request) {
+    public ApiResponse<Void> record(@Valid @RequestBody PeriodRecordDTO request) {
         return ApiResponse.fail(ApiCode.NOT_IMPLEMENTED,
                 "Period record scaffold created for startDate " + request.startDate());
     }

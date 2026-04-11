@@ -57,7 +57,7 @@ fun RecognizeResultScreen(
         item {
             AppPageHeader(
                 title = "识别结果",
-                subtitle = "列表结构保持不动，只把结果卡、Tag 和主按钮视觉统一到首页语言里。",
+                subtitle = "识别项来自后端上传响应，保存后会直接写入今日饮食记录。",
                 badgeText = if (uiState.items.isEmpty()) "空结果" else "${uiState.items.size} 项"
             )
         }
@@ -81,7 +81,7 @@ fun RecognizeResultScreen(
                 MetricRow(label = "识别项数", value = "${uiState.items.size}")
                 MetricRow(label = "预计热量", value = "${uiState.totalCalories} kcal")
                 Text(
-                    text = "本轮先保留固定 mock 结果，不做人工修正和删改交互。",
+                    text = "本轮先保留后端 mock 识别，不做人工修正和删改交互。",
                     style = MaterialTheme.typography.bodyLarge,
                     color = CocoaBrown.copy(alpha = 0.72f)
                 )

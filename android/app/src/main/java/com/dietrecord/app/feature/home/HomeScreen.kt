@@ -37,6 +37,7 @@ import com.dietrecord.app.core.ui.components.AppPrimaryButton
 import com.dietrecord.app.core.ui.components.AppRoundIconBadge
 import com.dietrecord.app.core.ui.components.AppSecondaryButton
 import com.dietrecord.app.core.ui.components.AppSectionCard
+import com.dietrecord.app.core.ui.components.InlineFeedback
 import com.dietrecord.app.core.ui.components.TagBadge
 import com.dietrecord.app.core.ui.theme.BlossomPink
 import com.dietrecord.app.core.ui.theme.CandyOrange
@@ -62,7 +63,7 @@ fun HomeScreen(
         item {
             AppPageHeader(
                 title = "今日饮食",
-                subtitle = "先把首页打磨成奶油粉色主视觉，热量记录也能看起来轻一点。",
+                subtitle = "首页总览和记录列表现在直接读取真实后端数据。",
                 badgeText = if (uiState.records.isEmpty()) "待开餐" else "${uiState.records.size} 餐"
             )
         }
@@ -79,9 +80,15 @@ fun HomeScreen(
                 text = "拍照记录这一餐",
                 onClick = onOpenCamera,
                 modifier = Modifier.fillMaxWidth(),
-                supportingText = "继续使用示例餐图，先把 MVP 主链路跑顺。",
+                supportingText = "继续用示例餐图走真实上传、识别和保存链路。",
                 badgeText = "拍"
             )
+        }
+
+        if (uiState.errorMessage != null) {
+            item {
+                InlineFeedback(message = uiState.errorMessage, isError = true)
+            }
         }
 
         item {
@@ -315,7 +322,7 @@ private fun HomeRecordCard(
                     color = CocoaBrown
                 )
                 Text(
-                    text = "首页已按 mock 保存结果刷新，后续再把这套设计语言扩到更多餐次细节。",
+                    text = "保存成功后，这里会直接显示 MySQL 中的真实记录结果。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = CocoaBrown.copy(alpha = 0.68f)
                 )

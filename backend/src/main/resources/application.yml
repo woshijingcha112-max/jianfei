@@ -5,10 +5,14 @@ spring:
   application:
     name: diet-record-backend
   datasource:
-    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/diet_record?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
+    url: ${DB_URL:jdbc:mysql://192.168.72.59:3306/dev_cse_finance?characterEncoding=UTF-8&useUnicode=true&useSSL=false&tinyInt1isBit=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai}
+    username: ${DB_USERNAME:cse_dev}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      encoding: UTF-8
+      schema-locations: classpath:db/schema.sql
   servlet:
     multipart:
       max-file-size: 5MB
@@ -20,6 +24,7 @@ spring:
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
+    default-enum-type-handler: org.apache.ibatis.type.EnumOrdinalTypeHandler
   global-config:
     banner: false
 

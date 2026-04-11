@@ -53,7 +53,7 @@ fun GoalScreen(
                 title = "保存后会同步首页总览卡"
             ) {
                 Text(
-                    text = "当前仍只做当前体重、目标体重和每日热量上限，不扩展趋势图和历史记录。",
+                    text = "当前体重由后端真实返回，仅做展示；本轮只允许修改目标体重和每日热量上限。",
                     style = MaterialTheme.typography.bodyLarge,
                     color = CocoaBrown.copy(alpha = 0.72f)
                 )
@@ -61,7 +61,8 @@ fun GoalScreen(
                     value = uiState.currentWeightInput,
                     onValueChange = onCurrentWeightChange,
                     label = "当前体重 kg",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    readOnly = true
                 )
                 AppTextField(
                     value = uiState.targetWeightInput,
@@ -106,7 +107,7 @@ fun GoalScreen(
                 onClick = onToggleSimulateFailure,
                 enabled = !uiState.isLoading,
                 modifier = Modifier.fillMaxWidth(),
-                supportingText = "保留最小调试入口，不改变表单主流程。",
+                supportingText = "保留最小调试入口，不影响真实保存链路。",
                 badgeText = "测"
             )
         }
