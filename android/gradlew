@@ -1,0 +1,27 @@
+#!/usr/bin/env sh
+
+APP_HOME=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+LOCAL_GRADLE="$APP_HOME/../tools/gradle/current/bin/gradle"
+
+if [ -f "$WRAPPER_JAR" ]; then
+  if [ -x "$APP_HOME/../tools/jdk/current/bin/java" ]; then
+    JAVA_EXE="$APP_HOME/../tools/jdk/current/bin/java"
+  else
+    JAVA_EXE=java
+  fi
+
+  exec "$JAVA_EXE" -classpath "$WRAPPER_JAR" org.gradle.wrapper.GradleWrapperMain "$@"
+fi
+
+if [ -x "$LOCAL_GRADLE" ]; then
+  if [ -x "$APP_HOME/../tools/jdk/current/bin/java" ]; then
+    export JAVA_HOME="$APP_HOME/../tools/jdk/current"
+    export PATH="$JAVA_HOME/bin:$PATH"
+  fi
+  exec "$LOCAL_GRADLE" -p "$APP_HOME" "$@"
+fi
+
+echo "Missing wrapper jar and local Gradle."
+echo "Run scripts/bootstrap-gradle.ps1 after download-dev-env.ps1."
+exit 1

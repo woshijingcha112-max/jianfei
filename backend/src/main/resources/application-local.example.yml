@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/diet_record?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+
+app:
+  storage:
+    upload-root: D:/data/diet-app/uploads
+    access-prefix: /uploads
+  baidu-ai:
+    enabled: false
+    api-key: replace_me
+    secret-key: replace_me
