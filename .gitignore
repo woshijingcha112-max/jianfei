@@ -3,6 +3,10 @@
 *.iml
 *.log
 
+.android-avd/
+.android-home/
+.gradle-codex/
+
 backend/target/
 backend/src/main/resources/application-local.yml
 
@@ -11,6 +15,7 @@ android/build/
 android/**/build/
 android/local.properties
 
+tools/
 tools/downloads/*.zip
 tools/downloads/*.exe
 tools/gradle/
