@@ -1,5 +1,191 @@
 # Project Develop Log
 
+## 2026-04-13 / 首页圆环尺寸微调
+### 本次主要完成内容
+
+- 按上一轮视觉调整幅度继续微调首页中间热量圆环尺寸，从 `92dp / 104dp` 上调为 `94dp / 106dp`。
+- 仅调整首页圆环尺寸，不改数据流、后端接口、目标刷新逻辑或底部导航。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+- `android\gradlew.bat :app:assembleDebug -PAPI_BASE_URL=http://124.221.144.48:8080/`：通过
+- `scripts/deploy-android-debug.ps1 -SkipBuild -DeviceSerial 192.168.5.7:35897 -Launch`：安装成功并启动成功
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 首页圆环放大与左右指标居中
+### 本次主要完成内容
+
+- 已将首页热量圆环从上一版 `75dp / 84dp` 上调为 `92dp / 104dp`。
+- 已将左右“饮食摄入 / 运动消耗”指标内部改为居中对齐，数值与标签同列居中展示。
+- 已使用远程后端地址重新构建并安装启动到真机 `192.168.5.7:35897`。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+- `android\gradlew.bat :app:assembleDebug -PAPI_BASE_URL=http://124.221.144.48:8080/`：通过
+- `scripts/deploy-android-debug.ps1 -SkipBuild -DeviceSerial 192.168.5.7:35897 -Launch`：安装成功并启动成功
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 首页圆环与营养卡字号二次压缩
+### 本次主要完成内容
+
+- 顶部周视图和首页主卡字体继续下调一档。
+- 热量圆环按当前尺寸约减半，并把粉色进度线进一步调细。
+- 圆环中心剩余热量数字从上一版 `36sp` 调整到 `25sp`，同时保持大于左右指标数值字号。
+- 左右“饮食摄入 / 运动消耗”字号下调并保留固定宽度，确保文案完整展示。
+- 碳水、蛋白、脂肪三张卡删除“参考”字样，并下调标签与数字字号。
+- 已使用远程后端地址重新构建并安装启动到真机 `192.168.5.7:35897`。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+- `android\gradlew.bat :app:assembleDebug -PAPI_BASE_URL=http://124.221.144.48:8080/`：通过
+- `scripts/deploy-android-debug.ps1 -SkipBuild -DeviceSerial 192.168.5.7:35897 -Launch`：安装成功并启动成功
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 首页周视图与热量圆环细化
+### 本次主要完成内容
+
+- 顶部周视图已改为只展示星期，不再展示日期数字。
+- 首页主卡中的 `MM月dd日` 保留展示，并下调字号。
+- 热量圆环区域按参考图结构继续收口：
+  - 圆环尺寸下调，粉色进度线变细
+  - “还可以吃(千卡)”下方数值字号下调
+  - “饮食摄入”和“运动消耗”改为左右固定宽度布局，避免被中间圆环遮挡或挤压
+- 碳水、蛋白、脂肪参考卡及以下内容未调整。
+- 已使用远程后端地址重新构建并安装启动到真机 `192.168.5.7:35897`。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+- `android\gradlew.bat :app:assembleDebug -PAPI_BASE_URL=http://124.221.144.48:8080/`：通过
+- `scripts/deploy-android-debug.ps1 -SkipBuild -DeviceSerial 192.168.5.7:35897 -Launch`：安装成功并启动成功
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 首页顶部冗余元素删减与热量圆环文案收口
+### 本次主要完成内容
+
+- 已删除首页顶部“猫”入口、“喵喵日记”、“今天”胶囊和右侧占位按钮，仅保留周视图。
+- 已将原顶部日期移入首页主卡标题位置，并按当前日期显示为 `MM月dd日` 格式。
+- 已按参考图 2 收口热量圆环区域文案与位置：
+  - 中心改为“还可以吃(千卡)”和剩余热量
+  - 下方改为“推荐摄入 + 目标热量”
+  - 左右补充“饮食摄入”和“运动消耗”
+- 碳水、蛋白、脂肪参考卡以及其下方记录列表、底部导航未在本轮继续调整。
+- 已使用远程后端地址重新构建并安装启动到真机 `192.168.5.7:35897`。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+- `android\gradlew.bat :app:assembleDebug -PAPI_BASE_URL=http://124.221.144.48:8080/`：通过
+- `scripts/deploy-android-debug.ps1 -SkipBuild -DeviceSerial 192.168.5.7:35897 -Launch`：安装成功并启动成功
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 目标保存后首页刷新修复与远程后端真机部署
+### 本次主要完成内容
+
+- 已修复“目标页修改热量目标后返回首页不刷新”的问题：
+  - 首页 `refresh()` 不再只依赖饮食记录列表 flow 重新发射
+  - 每次刷新会直接拉取今日记录和今日统计，并把最新 `targetCalories / consumedCalories` 写回首页状态
+- 已使用远程后端地址重新构建 Debug APK：
+  - `API_BASE_URL=http://124.221.144.48:8080/`
+- 已安装并启动到真机 `192.168.5.7:35897`。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+- `android\gradlew.bat :app:assembleDebug -PAPI_BASE_URL=http://124.221.144.48:8080/`：通过
+- `scripts/deploy-android-debug.ps1 -SkipBuild -DeviceSerial 192.168.5.7:35897 -Launch`：安装成功并启动成功
+
+### 本次约束说明
+
+- 本轮只修复首页刷新链路，不改后端接口、不改目标页表单语义、不扩展数据模型。
+- 部署脚本仍会设置 `adb reverse tcp:8080`，但本次 APK 已通过 `API_BASE_URL` 构建参数固定指向远程后端。
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 参照 React 导出稿做安卓首页最小 UI 替换
+### 本次主要完成内容
+
+- 已基于 `Mealflowreplica` 的 React 首页结构，按当前 Android 真实数据流重组首页视觉：
+  - 顶部改为“猫咪日记 + 今天 + 周视图”的轻量头部
+  - 首页主卡改为圆形热量进度卡，继续使用 `HomeUiState.summary.consumedCalories / targetCalories`
+  - 新增碳水、蛋白、脂肪三张参考营养卡，当前明确作为静态参考视觉，不接入后端真实字段
+  - 记录列表改为白底圆角餐食条目，继续使用现有 `DietRecordCardUiModel` 的摘要、时间、热量和标签
+- 已同步调整底部导航视觉为粉白半透明顶圆角样式，并在首页选中态使用自绘猫爪视觉；导航目的地和路由逻辑保持不变。
+- 本轮未引入 React 项目的 MUI、shadcn、lucide、motion 依赖，也未拷贝餐食静态图片到 Android 端。
+
+### 本次约束说明
+
+- 本轮只做首页和底部导航的最小视觉替换，不改后端接口、不改 Android 数据模型、不改拍照页、识别结果页和目标页。
+- 三大营养素当前不是业务真实值，后续若要真实显示，需要单独扩展后端返回与 Android UI model。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+- `android\gradlew.bat :app:assembleDebug`：通过
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 公网部署上线准备与远端后端启动
+### 本次主要完成内容
+
+- 后端继续采用环境变量承载部署配置，不把远端数据库密码、上传目录、日志目录和 AI Key 写入业务代码。
+- 安卓端新增 `API_BASE_URL` 构建参数入口：
+  - 可通过 `-PAPI_BASE_URL=http://124.221.144.48:8080/` 生成公网联调包
+  - 未传参数时仍保留原本模拟器 `10.0.2.2:8080` 与真机 `127.0.0.1:8080` 的本地联调默认值
+- 新增 `docs/deploy-production.md`，记录当前最小部署清单、环境变量、数据库、端口和 smoke test 命令。
+- 已在远端 Ubuntu 22.04.5 服务器 `124.221.144.48` 安装 OpenJDK 17 与 MySQL 8。
+- 已创建远端应用目录 `/opt/diet-app`、上传目录 `/opt/diet-app/uploads`、日志目录 `/var/log/diet-app` 和 systemd 服务 `diet-app.service`。
+- 已导入当前 `schema.sql`，创建仅允许本机访问 MySQL 的应用用户，MySQL 仅监听 `127.0.0.1:3306`。
+- 已部署本地后端 jar 到 `/opt/diet-app/diet-record-backend.jar` 并启动服务。
+- 已通过 UFW 开放 `22/tcp` 与 `8080/tcp`，未开放 MySQL `3306`。
+- 已用真实公网地址重新构建安卓 Debug APK，生成产物位于 `android/app/build/outputs/apk/debug/app-debug.apk`。
+
+### 本次验证结果
+
+- `powershell -ExecutionPolicy Bypass -File scripts/backend-mvn.ps1 -DskipTests package`：通过
+- `android\gradlew.bat :app:assembleDebug -PAPI_BASE_URL=http://124.221.144.48:8080/`：通过
+- 远端 `diet-app.service`：active running
+- 本机公网访问 `POST http://124.221.144.48:8080/diet/stat/today` 携带日期参数：HTTP 200
+
+### 本次暴露的缺陷或偏差
+
+- 当前远端 `PHOTO_AI_ZHIPU_API_KEY` 暂未配置，后续拿到真实 Key 后需要更新 `/etc/diet-app.env` 并重启 `diet-app.service`。
+- 当前只是公网直连 `8080` 的最小联调部署，尚未接入域名、HTTPS、Nginx 反代或正式发布签名 APK。
+- 当前使用临时 root 密码完成部署；部署完成后应立即由用户修改 root 密码，并在后续切换到密钥登录。
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 首页与拍照页结构重做（当前会话 Figma 工具阻塞）
+### 本次约束说明
+
+- 本轮目标仍按“首页结构重排 + 拍照页全屏化”推进，但当前会话未提供可直接写入 Figma 的工具入口，无法在本轮先完成 Figma 画稿。
+- 因此本轮先落地安卓端代码改造，并把 Figma 稿补建保留为后续在工具可用会话中的同主题收口项，避免伪造未实际产出的设计资产。
+- 本轮仍不改目标页、不改底部导航逻辑、不引入三大营养素假数据。
+
 ## 2026-04-12 / 首页总览卡二次收口与真机重新部署
 ### 本次主要完成内容
 

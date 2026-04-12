@@ -7,6 +7,13 @@ android {
     namespace = "com.dietrecord.app"
     compileSdk = 36
 
+    val apiBaseUrl = providers.gradleProperty("API_BASE_URL")
+        .orElse(providers.environmentVariable("API_BASE_URL"))
+        .orElse("")
+        .get()
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
     defaultConfig {
         applicationId = "com.dietrecord.app"
         minSdk = 26
@@ -14,6 +21,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {

@@ -1,8 +1,11 @@
 package com.dietrecord.app.navigation
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -14,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -65,10 +69,10 @@ fun AppNavHost() {
 
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    color = CreamWhite.copy(alpha = 0.96f),
-                    shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
-                    shadowElevation = 10.dp,
-                    border = BorderStroke(1.dp, RibbonPink.copy(alpha = 0.45f))
+                    color = CreamWhite.copy(alpha = 0.95f),
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    shadowElevation = 12.dp,
+                    border = BorderStroke(1.dp, RibbonPink.copy(alpha = 0.28f))
                 ) {
                     NavigationBar(
                         modifier = Modifier.fillMaxWidth(),
@@ -90,10 +94,7 @@ fun AppNavHost() {
                                 },
                                 alwaysShowLabel = true,
                                 icon = {
-                                    Icon(
-                                        imageVector = destination.requireIcon(),
-                                        contentDescription = destination.label
-                                    )
+                                    BottomNavIcon(destination = destination, selected = selected)
                                 },
                                 label = {
                                     Text(text = destination.label)
@@ -101,9 +102,9 @@ fun AppNavHost() {
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = BlossomPink,
                                     selectedTextColor = BlossomPink,
-                                    unselectedIconColor = CocoaBrown.copy(alpha = 0.72f),
-                                    unselectedTextColor = CocoaBrown.copy(alpha = 0.72f),
-                                    indicatorColor = BlossomPink.copy(alpha = 0.14f)
+                                    unselectedIconColor = CocoaBrown.copy(alpha = 0.42f),
+                                    unselectedTextColor = CocoaBrown.copy(alpha = 0.52f),
+                                    indicatorColor = BlossomPink.copy(alpha = 0.1f)
                                 )
                             )
                         }
@@ -198,5 +199,32 @@ fun AppNavHost() {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BottomNavIcon(
+    destination: AppDestination,
+    selected: Boolean
+) {
+    if (destination == AppDestination.Home && selected) {
+        Box(
+            modifier = Modifier.size(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.size(32.dp)) {
+                val paw = BlossomPink.copy(alpha = 0.7f)
+                drawCircle(color = paw, radius = 8.dp.toPx(), center = center.copy(y = center.y + 4.dp.toPx()))
+                drawCircle(color = paw, radius = 4.dp.toPx(), center = center.copy(x = center.x - 10.dp.toPx(), y = center.y - 6.dp.toPx()))
+                drawCircle(color = paw, radius = 4.dp.toPx(), center = center.copy(x = center.x - 3.dp.toPx(), y = center.y - 10.dp.toPx()))
+                drawCircle(color = paw, radius = 4.dp.toPx(), center = center.copy(x = center.x + 5.dp.toPx(), y = center.y - 10.dp.toPx()))
+                drawCircle(color = paw, radius = 4.dp.toPx(), center = center.copy(x = center.x + 12.dp.toPx(), y = center.y - 6.dp.toPx()))
+            }
+        }
+    } else {
+        Icon(
+            imageVector = destination.requireIcon(),
+            contentDescription = destination.label
+        )
     }
 }

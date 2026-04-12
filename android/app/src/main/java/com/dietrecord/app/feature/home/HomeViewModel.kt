@@ -53,8 +53,17 @@ class HomeViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             Log.i(TAG, "开始刷新首页今日数据")
             runCatching {
-                dietRecordRepository.listTodayRecords(LocalDate.now())
-            }.onSuccess {
+                val today = LocalDate.now()
+                val records = dietRecordRepository.listTodayRecords(today)
+                val summary = dietRecordRepository.getTodaySummary(today)
+                summary.copy(records = records) to records
+            }.onSuccess { (summary, records) ->
+                _uiState.value = HomeUiState(
+                    isLoading = false,
+                    errorMessage = null,
+                    summary = summary,
+                    records = records
+                )
                 Log.i(TAG, "首页今日数据刷新完成")
             }.onFailure {
                 Log.e(TAG, "首页今日数据刷新失败", it)

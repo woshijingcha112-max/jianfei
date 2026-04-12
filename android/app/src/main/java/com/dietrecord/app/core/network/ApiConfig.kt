@@ -1,6 +1,7 @@
 package com.dietrecord.app.core.network
 
 import android.os.Build
+import com.dietrecord.app.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -15,7 +16,8 @@ object ApiConfig {
     private const val IO_TIMEOUT_SECONDS = 90L
 
     val DEFAULT_BASE_URL: String
-        get() = if (isRunningOnEmulator()) EMULATOR_BASE_URL else REAL_DEVICE_BASE_URL
+        get() = BuildConfig.API_BASE_URL.takeIf { it.isNotBlank() }
+            ?: if (isRunningOnEmulator()) EMULATOR_BASE_URL else REAL_DEVICE_BASE_URL
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BASIC
