@@ -40,7 +40,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -64,7 +63,6 @@ fun CameraScreen(
     uiState: CameraUiState,
     onRecognize: (File) -> Unit,
     onConsumeNavigation: () -> Unit,
-    onToggleSimulateFailure: () -> Unit,
     onDismissError: () -> Unit,
     onCaptureError: (String) -> Unit
 ) {
@@ -90,7 +88,7 @@ fun CameraScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (!granted) {
-            onCaptureError("Camera permission is required.")
+            onCaptureError("请先授予相机权限。")
         } else {
             onDismissError()
         }
@@ -144,7 +142,7 @@ fun CameraScreen(
                 onDismissError()
             }.onFailure {
                 imageCapture = null
-                onCaptureError("Camera preview failed to start.")
+                onCaptureError("相机预览启动失败，请重试。")
             }
             onDispose {
                 provider.unbindAll()
@@ -165,21 +163,14 @@ fun CameraScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        AppPageHeader(
-            title = "拍照识别",
-            subtitle = "对准餐食拍照，再上传到后端进行识别。",
-            badgeText = "REAL"
-        )
+        AppPageHeader(title = "拍照")
 
-        AppSectionCard(
-            eyebrow = "实时取景",
-            title = "CameraX 预览 + 拍照 + 上传"
-        ) {
+        AppSectionCard {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(320.dp)
-                    .clip(RoundedCornerShape(28.dp))
+                    .clip(RoundedCornerShape(24.dp))
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
@@ -215,12 +206,12 @@ fun CameraScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         AppAccentBadge(
-                            text = "权限未开启",
+                            text = "未授权",
                             containerColor = CreamWhite.copy(alpha = 0.96f),
                             contentColor = BlossomPink
                         )
                         Text(
-                            text = "请先授予相机权限，才能打开实时预览。",
+                            text = "授予相机权限后即可拍照。",
                             modifier = Modifier.padding(top = 12.dp),
                             style = MaterialTheme.typography.bodyLarge,
                             color = CocoaBrown,
@@ -233,7 +224,7 @@ fun CameraScreen(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(16.dp)
-                        .background(CreamWhite.copy(alpha = 0.92f), RoundedCornerShape(18.dp))
+                        .background(CreamWhite.copy(alpha = 0.92f), RoundedCornerShape(16.dp))
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
@@ -242,53 +233,16 @@ fun CameraScreen(
                         color = BlossomPink
                     )
                 }
-
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 18.dp, vertical = 18.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    AppAccentBadge(
-                        text = "上传到 /diet/photo/upload",
-                        containerColor = CreamWhite.copy(alpha = 0.94f),
-                        contentColor = CocoaBrown
-                    )
-                    Text(
-                        text = "继续复用现有识别结果页与保存链路。",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = CocoaBrown,
-                        textAlign = TextAlign.Center
-                    )
-                }
             }
         }
 
-        AppSectionCard(
-            eyebrow = "当前链路",
-            title = "拍照、上传并复用现有识别会话状态"
-        ) {
-            Text(
-                text = "拍照结果会先保存到应用内临时文件，再上传到后端识别接口。",
-                style = MaterialTheme.typography.bodyLarge,
-                color = CocoaBrown.copy(alpha = 0.74f)
-            )
-            if (uiState.errorMessage != null) {
-                InlineFeedback(message = uiState.errorMessage, isError = true)
-                AppSecondaryButton(
-                    text = "清除提示",
-                    onClick = onDismissError,
-                    modifier = Modifier.fillMaxWidth(),
-                    badgeText = "清"
-                )
-            }
+        if (uiState.errorMessage != null) {
+            InlineFeedback(message = uiState.errorMessage, isError = true)
         }
 
         AppPrimaryButton(
             text = when {
-                uiState.isRecognizing -> "上传识别中..."
+                uiState.isRecognizing -> "识别中..."
                 isCapturing -> "拍照中..."
                 else -> "拍照并识别"
             },
@@ -299,7 +253,7 @@ fun CameraScreen(
                     return@AppPrimaryButton
                 }
                 if (currentCapture == null) {
-                    onCaptureError("相机仍在初始化，请稍后再试。")
+                    onCaptureError("相机正在启动，请稍后再试。")
                     return@AppPrimaryButton
                 }
                 if (uiState.isRecognizing || isCapturing) {
@@ -326,17 +280,7 @@ fun CameraScreen(
                 )
             },
             enabled = !uiState.isRecognizing && !isCapturing,
-            modifier = Modifier.fillMaxWidth(),
-            supportingText = "本轮只替换示例餐图入口，不扩展其他识别交互。",
-            badgeText = "拍"
-        )
-
-        AppSecondaryButton(
-            text = if (uiState.simulateNextFailure) "已开启：下次识别失败" else "模拟下次识别失败",
-            onClick = onToggleSimulateFailure,
-            modifier = Modifier.fillMaxWidth(),
-            supportingText = "只用于验证失败提示，不影响正式主链路。",
-            badgeText = "测"
+            modifier = Modifier.fillMaxWidth()
         )
 
         if (!cameraPermissionGranted) {
@@ -346,9 +290,7 @@ fun CameraScreen(
                     permissionRequested = true
                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                 },
-                modifier = Modifier.fillMaxWidth(),
-                supportingText = "授权后会自动拉起相机实时预览。",
-                badgeText = "权"
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }

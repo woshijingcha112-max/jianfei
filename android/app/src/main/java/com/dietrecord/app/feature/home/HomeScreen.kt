@@ -26,9 +26,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.dietrecord.app.core.model.DietRecordCardUiModel
 import com.dietrecord.app.core.model.HomeSummaryUiModel
 import com.dietrecord.app.core.ui.components.AppAccentBadge
@@ -53,19 +60,18 @@ fun HomeScreen(
     onOpenGoal: () -> Unit,
     onOpenCamera: () -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val horizontalPadding = if (configuration.screenWidthDp <= 412) 16.dp else 20.dp
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = horizontalPadding),
         contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item {
-            AppPageHeader(
-                title = "今日饮食",
-                subtitle = "首页总览和记录列表现在直接读取真实后端数据。",
-                badgeText = if (uiState.records.isEmpty()) "待开餐" else "${uiState.records.size} 餐"
-            )
+            AppPageHeader(title = "今日饮食")
         }
 
         item {
@@ -77,11 +83,9 @@ fun HomeScreen(
 
         item {
             AppPrimaryButton(
-                text = "拍照记录这一餐",
+                text = "拍照记录",
                 onClick = onOpenCamera,
-                modifier = Modifier.fillMaxWidth(),
-                supportingText = "继续用示例餐图走真实上传、识别和保存链路。",
-                badgeText = "拍"
+                modifier = Modifier.fillMaxWidth()
             )
         }
 
@@ -103,19 +107,16 @@ fun HomeScreen(
                     color = CocoaBrown
                 )
                 AppAccentBadge(
-                    text = if (uiState.records.isEmpty()) "还没有记录" else "已记录 ${uiState.records.size} 餐"
+                    text = if (uiState.records.isEmpty()) "暂无记录" else "${uiState.records.size} 条"
                 )
             }
         }
 
         if (uiState.isEmpty) {
             item {
-                AppSectionCard(
-                    eyebrow = "今天还没开吃",
-                    title = "先拍一餐，让首页活起来"
-                ) {
+                AppSectionCard(title = "今天还没有记录") {
                     Text(
-                        text = "本轮重点是把首页气质定住。先走一次拍照识别，再回来看卡片和进度条的刷新效果。",
+                        text = "拍一餐后会显示在这里。",
                         style = MaterialTheme.typography.bodyLarge,
                         color = CocoaBrown.copy(alpha = 0.74f)
                     )
@@ -137,7 +138,20 @@ private fun HomeOverviewCard(
     summary: HomeSummaryUiModel,
     onOpenGoal: () -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val isCompactWidth = configuration.screenWidthDp <= 360
+    val isPhoneCompactWidth = configuration.screenWidthDp <= 412
     val remainingCalories = (summary.targetCalories - summary.consumedCalories).coerceAtLeast(0)
+    val cardPadding = if (isCompactWidth) 14.dp else 18.dp
+    val outerCardPadding = if (isPhoneCompactWidth) 14.dp else 18.dp
+    val sectionSpacing = if (isCompactWidth) 14.dp else 16.dp
+    val metricSpacing = if (isCompactWidth) 8.dp else 12.dp
+    val summaryTitleStyle = if (isCompactWidth) {
+        MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp, lineHeight = 30.sp)
+    } else {
+        MaterialTheme.typography.headlineMedium
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.Transparent,
@@ -155,14 +169,13 @@ private fun HomeOverviewCard(
                     ),
                     shape = MaterialTheme.shapes.extraLarge
                 )
-                .padding(18.dp)
+                .padding(outerCardPadding)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            BoxWithConstraints {
+                val estimatedMetricWidth = (maxWidth - metricSpacing) / 2
+                val shouldStackMetrics = estimatedMetricWidth < 176.dp || configuration.fontScale >= 1.15f
+
+                Column(verticalArrangement = Arrangement.spacedBy(sectionSpacing)) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         AppAccentBadge(
                             text = summary.dateLabel,
@@ -171,74 +184,86 @@ private fun HomeOverviewCard(
                         )
                         Text(
                             text = "今日总览",
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = summaryTitleStyle,
                             color = CocoaBrown
-                        )
-                        Text(
-                            text = "把关键数字收进一张核心视觉卡里。",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = CocoaBrown.copy(alpha = 0.72f)
                         )
                     }
-                    AppRoundIconBadge(
-                        text = "甜",
-                        containerColor = CreamWhite.copy(alpha = 0.95f),
-                        contentColor = BlossomPink
-                    )
-                }
 
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = CreamWhite.copy(alpha = 0.96f),
-                    shape = MaterialTheme.shapes.large
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = CreamWhite.copy(alpha = 0.96f),
+                        shape = MaterialTheme.shapes.large
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        Column(
+                            modifier = Modifier.padding(horizontal = cardPadding, vertical = cardPadding),
+                            verticalArrangement = Arrangement.spacedBy(sectionSpacing)
                         ) {
-                            OverviewMetricBlock(
-                                modifier = Modifier.weight(1f),
-                                label = "已摄入",
-                                value = "${summary.consumedCalories}",
-                                unit = "kcal",
-                                accent = CandyOrange
+                            if (shouldStackMetrics) {
+                                Column(verticalArrangement = Arrangement.spacedBy(metricSpacing)) {
+                                    OverviewMetricBlock(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        label = "已摄入",
+                                        value = "${summary.consumedCalories}",
+                                        unit = "kcal",
+                                        accent = CandyOrange,
+                                        compactLayout = true
+                                    )
+                                    OverviewMetricBlock(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        label = "目标",
+                                        value = "${summary.targetCalories}",
+                                        unit = "kcal",
+                                        accent = BlossomPink,
+                                        compactLayout = true
+                                    )
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(metricSpacing)
+                                ) {
+                                    OverviewMetricBlock(
+                                        modifier = Modifier.weight(1f),
+                                        label = "已摄入",
+                                        value = "${summary.consumedCalories}",
+                                        unit = "kcal",
+                                        accent = CandyOrange,
+                                        compactLayout = isPhoneCompactWidth
+                                    )
+                                    OverviewMetricBlock(
+                                        modifier = Modifier.weight(1f),
+                                        label = "目标",
+                                        value = "${summary.targetCalories}",
+                                        unit = "kcal",
+                                        accent = BlossomPink,
+                                        compactLayout = isPhoneCompactWidth
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = if (remainingCalories > 0) {
+                                    "今天还可以摄入 $remainingCalories kcal"
+                                } else {
+                                    "今天已达到目标"
+                                },
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = CocoaBrown
                             )
-                            OverviewMetricBlock(
-                                modifier = Modifier.weight(1f),
-                                label = "目标",
-                                value = "${summary.targetCalories}",
-                                unit = "kcal",
-                                accent = BlossomPink
+
+                            GoalAnchoredProgressBar(
+                                consumedCalories = summary.consumedCalories,
+                                targetCalories = summary.targetCalories,
+                                compactLayout = shouldStackMetrics || isPhoneCompactWidth,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            AppSecondaryButton(
+                                text = "调整目标",
+                                onClick = onOpenGoal,
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
-
-                        Text(
-                            text = if (remainingCalories > 0) {
-                                "今天还可以安排 $remainingCalories kcal，保持轻甜节奏。"
-                            } else {
-                                "今天已经碰到目标线了，后面可以尽量清爽一点。"
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = CocoaBrown
-                        )
-
-                        GoalAnchoredProgressBar(
-                            consumedCalories = summary.consumedCalories,
-                            targetCalories = summary.targetCalories,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        AppSecondaryButton(
-                            text = "调整目标",
-                            onClick = onOpenGoal,
-                            modifier = Modifier.fillMaxWidth(),
-                            supportingText = "同步目标体重和每日热量上限。",
-                            badgeText = "目"
-                        )
                     }
                 }
             }
@@ -252,8 +277,20 @@ private fun OverviewMetricBlock(
     value: String,
     unit: String,
     accent: Color,
+    compactLayout: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val valueStyle = if (compactLayout) {
+        MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp, lineHeight = 30.sp)
+    } else {
+        MaterialTheme.typography.headlineMedium
+    }
+    val unitStyle = if (compactLayout) {
+        MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp, lineHeight = 16.sp)
+    } else {
+        MaterialTheme.typography.labelLarge
+    }
+
     Surface(
         modifier = modifier,
         color = WarningPeach.copy(alpha = 0.45f),
@@ -268,21 +305,34 @@ private fun OverviewMetricBlock(
                 style = MaterialTheme.typography.labelLarge,
                 color = CocoaBrown.copy(alpha = 0.72f)
             )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = accent
-                )
-                Text(
-                    text = unit,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = CocoaBrown.copy(alpha = 0.7f)
-                )
-            }
+            Text(
+                text = buildAnnotatedString {
+                    withStyle(
+                        SpanStyle(
+                            color = accent,
+                            fontSize = valueStyle.fontSize,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = valueStyle.letterSpacing
+                        )
+                    ) {
+                        append(value)
+                    }
+                    append(" ")
+                    withStyle(
+                        SpanStyle(
+                            color = CocoaBrown.copy(alpha = 0.7f),
+                            fontSize = unitStyle.fontSize,
+                            fontWeight = unitStyle.fontWeight,
+                            letterSpacing = unitStyle.letterSpacing
+                        )
+                    ) {
+                        append(unit)
+                    }
+                },
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip
+            )
         }
     }
 }
@@ -321,11 +371,6 @@ private fun HomeRecordCard(
                     style = MaterialTheme.typography.titleMedium,
                     color = CocoaBrown
                 )
-                Text(
-                    text = "保存成功后，这里会直接显示 MySQL 中的真实记录结果。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = CocoaBrown.copy(alpha = 0.68f)
-                )
                 TagBadge(level = record.dominantTag)
             }
         }
@@ -337,6 +382,7 @@ private fun GoalAnchoredProgressBar(
     consumedCalories: Int,
     targetCalories: Int,
     modifier: Modifier = Modifier,
+    compactLayout: Boolean = false,
     anchorRatio: Float = 0.82f,
     maxOverflowMultiplier: Float = 2f,
     barHeight: Dp = 16.dp
@@ -348,6 +394,7 @@ private fun GoalAnchoredProgressBar(
         safeConsumed <= safeTarget -> {
             (safeConsumed.toFloat() / safeTarget.toFloat()) * anchorRatio
         }
+
         else -> {
             val overflowRange = safeTarget * (maxOverflowMultiplier - 1f)
             val overflowProgress = if (overflowRange <= 0f) {
@@ -362,22 +409,30 @@ private fun GoalAnchoredProgressBar(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
         ) {
             Text(
+                modifier = Modifier.weight(1f),
                 text = "当前 ${safeConsumed} kcal",
                 style = MaterialTheme.typography.labelLarge,
                 color = CocoaBrown
             )
             Text(
-                text = if (remaining > 0) "剩余 $remaining kcal" else "已到达目标线",
+                modifier = Modifier.weight(1f),
+                text = if (remaining > 0) "剩余 $remaining kcal" else "已达目标",
                 style = MaterialTheme.typography.labelLarge,
-                color = if (remaining > 0) BlossomPink else StrawberryRed
+                color = if (remaining > 0) BlossomPink else StrawberryRed,
+                textAlign = TextAlign.End
             )
         }
 
         BoxWithConstraints(modifier = modifier) {
-            val badgeWidth = 96.dp
+            val badgeWidth = when {
+                safeTarget >= 1000 -> if (compactLayout) 116.dp else 124.dp
+                compactLayout -> 92.dp
+                else -> 96.dp
+            }
             val maxOffset = (maxWidth - badgeWidth).coerceAtLeast(0.dp)
             val badgeOffset = ((maxWidth * anchorRatio) - (badgeWidth / 2)).coerceIn(0.dp, maxOffset)
 

@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.dietrecord.app.core.model.FoodTagLevel
 import com.dietrecord.app.core.ui.theme.BlossomPink
@@ -95,7 +96,7 @@ fun AppBackground(
 @Composable
 fun AppPageHeader(
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
     modifier: Modifier = Modifier,
     badgeText: String? = null,
     onBackClick: (() -> Unit)? = null
@@ -107,8 +108,8 @@ fun AppPageHeader(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = Color.Transparent,
-            shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp, bottomStart = 18.dp, bottomEnd = 18.dp),
-            shadowElevation = 10.dp
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 14.dp, bottomEnd = 14.dp),
+            shadowElevation = 6.dp
         ) {
             Box(
                 modifier = Modifier
@@ -120,11 +121,11 @@ fun AppPageHeader(
                             )
                         )
                     )
-                    .padding(horizontal = 22.dp, vertical = 22.dp)
+                    .padding(horizontal = 18.dp, vertical = 16.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -143,18 +144,20 @@ fun AppPageHeader(
                         }
                         Column(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
                                 text = title,
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = CocoaBrown
                             )
-                            Text(
-                                text = subtitle,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = CocoaBrown.copy(alpha = 0.72f)
-                            )
+                            if (!subtitle.isNullOrBlank()) {
+                                Text(
+                                    text = subtitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = CocoaBrown.copy(alpha = 0.72f)
+                                )
+                            }
                         }
                         if (badgeText != null) {
                             AppAccentBadge(
@@ -197,22 +200,26 @@ fun AppAccentBadge(
 fun AppRoundIconBadge(
     text: String,
     modifier: Modifier = Modifier,
+    size: Dp = 52.dp,
+    cornerRadius: Dp = 18.dp,
     containerColor: Color = PetalPink,
     contentColor: Color = BlossomPink
 ) {
     Surface(
-        modifier = modifier.size(52.dp),
+        modifier = modifier.size(size),
         color = containerColor,
         contentColor = contentColor,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(cornerRadius),
         shadowElevation = 6.dp
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold
-            )
+            if (text.isNotBlank()) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
         }
     }
 }
@@ -491,7 +498,7 @@ private fun ScallopTrim(
     androidx.compose.foundation.Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(16.dp)
+            .height(10.dp)
     ) {
         val radius = size.height * 0.95f
         var centerX = radius

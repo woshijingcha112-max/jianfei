@@ -7,6 +7,7 @@ data class DietDateDTO(
 )
 
 data class GoalSaveDTO(
+    val currentWeight: BigDecimal,
     val targetWeight: BigDecimal,
     val dailyCalLimit: Int
 )

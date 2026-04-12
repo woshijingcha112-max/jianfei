@@ -1,6 +1,7 @@
 package com.dietrecord.app.core.data
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.dietrecord.app.core.network.ApiConfig
@@ -17,6 +18,14 @@ import com.dietrecord.app.feature.recognize.RecognizeResultViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 
+private const val TAG = "AppContainer"
+
+/**
+ * 全局依赖容器。
+ *
+ * 这里集中创建网络服务、Repository 和各页面 ViewModel Factory，
+ * 让 Java 开发可以按“容器 -> 仓储 -> ViewModel -> 页面”的结构理解安卓代码。
+ */
 class AppContainer(
     context: Context,
     private val baseUrl: String = ApiConfig.DEFAULT_BASE_URL,
@@ -24,6 +33,12 @@ class AppContainer(
 ) {
     private val appScope = CoroutineScope(SupervisorJob() + dispatchers.io)
     private val dietApiService = ApiConfig.createDietApiService(baseUrl)
+    val refreshCoordinator = AppRefreshCoordinator()
+
+    init {
+        Log.i(TAG, "创建应用容器，baseUrl=$baseUrl")
+        Log.d(TAG, "应用上下文包名=${context.packageName}")
+    }
 
     val goalRepository: GoalRepository = RealGoalRepository(
         api = dietApiService,
@@ -49,7 +64,10 @@ class AppContainer(
     }
 
     fun goalViewModelFactory(): ViewModelProvider.Factory = simpleFactory {
-        GoalViewModel(goalRepository = goalRepository)
+        GoalViewModel(
+            goalRepository = goalRepository,
+            refreshCoordinator = refreshCoordinator
+        )
     }
 
     fun cameraViewModelFactory(): ViewModelProvider.Factory = simpleFactory {
@@ -59,11 +77,17 @@ class AppContainer(
     fun recognizeResultViewModelFactory(): ViewModelProvider.Factory = simpleFactory {
         RecognizeResultViewModel(
             recognitionRepository = recognitionRepository,
-            dietRecordRepository = dietRecordRepository
+            dietRecordRepository = dietRecordRepository,
+            refreshCoordinator = refreshCoordinator
         )
     }
 }
 
+/**
+ * 最小化 ViewModel 工厂。
+ *
+ * 当前项目没有引入 DI 框架，这里用统一工厂把依赖注入 ViewModel。
+ */
 private fun <T : ViewModel> simpleFactory(
     create: () -> T
 ): ViewModelProvider.Factory {
