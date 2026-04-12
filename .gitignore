@@ -6,6 +6,7 @@
 .android-avd/
 .android-home/
 .gradle-codex/
+.m2-codex/
 
 backend/target/
 backend/src/main/resources/application-local.yml
