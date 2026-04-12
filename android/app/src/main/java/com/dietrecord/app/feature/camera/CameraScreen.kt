@@ -3,6 +3,8 @@ package com.dietrecord.app.feature.camera
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Color as AndroidColor
+import android.view.View
 import android.widget.FrameLayout
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,11 +20,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,8 +33,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -44,11 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.dietrecord.app.core.ui.components.AppAccentBadge
-import com.dietrecord.app.core.ui.components.AppPageHeader
-import com.dietrecord.app.core.ui.components.AppPrimaryButton
 import com.dietrecord.app.core.ui.components.AppSecondaryButton
-import com.dietrecord.app.core.ui.components.AppSectionCard
 import com.dietrecord.app.core.ui.components.InlineFeedback
 import com.dietrecord.app.core.ui.theme.BlossomPink
 import com.dietrecord.app.core.ui.theme.CocoaBrown
@@ -61,8 +54,9 @@ import java.util.Locale
 @Composable
 fun CameraScreen(
     uiState: CameraUiState,
+    captureRequestId: Int,
+    previewVisible: Boolean,
     onRecognize: (File) -> Unit,
-    onConsumeNavigation: () -> Unit,
     onDismissError: () -> Unit,
     onCaptureError: (String) -> Unit
 ) {
@@ -72,6 +66,7 @@ fun CameraScreen(
         PreviewView(context).apply {
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
             scaleType = PreviewView.ScaleType.FILL_CENTER
+            setBackgroundColor(AndroidColor.BLACK)
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -83,6 +78,7 @@ fun CameraScreen(
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var isCapturing by rememberSaveable { mutableStateOf(false) }
     var permissionRequested by rememberSaveable { mutableStateOf(false) }
+    var handledCaptureRequestId by remember { mutableStateOf(0) }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -150,138 +146,95 @@ fun CameraScreen(
         }
     }
 
-    LaunchedEffect(uiState.navigateToResult) {
-        if (uiState.navigateToResult) {
-            onConsumeNavigation()
+    fun triggerCapture() {
+        val currentCapture = imageCapture
+        if (!cameraPermissionGranted) {
+            onCaptureError("请先授予相机权限。")
+            return
         }
+        if (currentCapture == null) {
+            onCaptureError("相机正在启动，请稍后再试。")
+            return
+        }
+        if (uiState.isRecognizing || isCapturing) {
+            return
+        }
+
+        val photoFile = createCaptureFile(context)
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+        isCapturing = true
+        currentCapture.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                    isCapturing = false
+                    onRecognize(photoFile)
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    isCapturing = false
+                    onCaptureError("拍照失败，请重试。")
+                }
+            }
+        )
     }
 
-    Column(
+    LaunchedEffect(captureRequestId, cameraPermissionGranted, imageCapture, uiState.isRecognizing) {
+        if (captureRequestId == 0 || captureRequestId <= handledCaptureRequestId) {
+            return@LaunchedEffect
+        }
+        if (!cameraPermissionGranted || imageCapture == null || uiState.isRecognizing || isCapturing) {
+            return@LaunchedEffect
+        }
+
+        handledCaptureRequestId = captureRequestId
+        triggerCapture()
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .clipToBounds()
+            .background(Color.Black)
     ) {
-        AppPageHeader(title = "拍照")
-
-        AppSectionCard {
-            Box(
+        if (cameraPermissionGranted) {
+            AndroidView(
+                factory = { previewView },
+                update = { view ->
+                    view.visibility = if (previewVisible) View.VISIBLE else View.INVISIBLE
+                    view.alpha = if (previewVisible) 1f else 0f
+                },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(320.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFFFFF8F5),
-                                Color(0xFFFFE7DB)
-                            )
-                        )
-                    )
+                    .fillMaxSize()
+                    .clipToBounds()
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 28.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (cameraPermissionGranted) {
-                    AndroidView(
-                        factory = { previewView },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color(0x33000000)
-                                    )
-                                )
-                            )
-                    )
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        AppAccentBadge(
-                            text = "未授权",
-                            containerColor = CreamWhite.copy(alpha = 0.96f),
-                            contentColor = BlossomPink
-                        )
-                        Text(
-                            text = "授予相机权限后即可拍照。",
-                            modifier = Modifier.padding(top = 12.dp),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = CocoaBrown,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(16.dp)
-                        .background(CreamWhite.copy(alpha = 0.92f), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = if (isCapturing) "拍照中" else "实时取景",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = BlossomPink
-                    )
-                }
+                Text(
+                    text = "授予相机权限后即可拍照识别。",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = CreamWhite,
+                    textAlign = TextAlign.Center
+                )
             }
         }
 
-        if (uiState.errorMessage != null) {
-            InlineFeedback(message = uiState.errorMessage, isError = true)
+        if (previewVisible && uiState.errorMessage != null) {
+            InlineFeedback(
+                message = uiState.errorMessage,
+                isError = true,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+            )
         }
-
-        AppPrimaryButton(
-            text = when {
-                uiState.isRecognizing -> "识别中..."
-                isCapturing -> "拍照中..."
-                else -> "拍照并识别"
-            },
-            onClick = {
-                val currentCapture = imageCapture
-                if (!cameraPermissionGranted) {
-                    onCaptureError("请先授予相机权限。")
-                    return@AppPrimaryButton
-                }
-                if (currentCapture == null) {
-                    onCaptureError("相机正在启动，请稍后再试。")
-                    return@AppPrimaryButton
-                }
-                if (uiState.isRecognizing || isCapturing) {
-                    return@AppPrimaryButton
-                }
-
-                val photoFile = createCaptureFile(context)
-                val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-                isCapturing = true
-                currentCapture.takePicture(
-                    outputOptions,
-                    ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageSavedCallback {
-                        override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                            isCapturing = false
-                            onRecognize(photoFile)
-                        }
-
-                        override fun onError(exception: ImageCaptureException) {
-                            isCapturing = false
-                            onCaptureError("拍照失败，请重试。")
-                        }
-                    }
-                )
-            },
-            enabled = !uiState.isRecognizing && !isCapturing,
-            modifier = Modifier.fillMaxWidth()
-        )
 
         if (!cameraPermissionGranted) {
             AppSecondaryButton(
@@ -290,9 +243,13 @@ fun CameraScreen(
                     permissionRequested = true
                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 20.dp)
             )
         }
+
     }
 }
 

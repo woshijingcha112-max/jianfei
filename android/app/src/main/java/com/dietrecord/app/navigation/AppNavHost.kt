@@ -2,35 +2,37 @@ package com.dietrecord.app.navigation
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
 import com.dietrecord.app.DietRecordApp
 import com.dietrecord.app.core.ui.components.AppBackground
-import com.dietrecord.app.core.ui.components.AppDestinationRefreshEffect
 import com.dietrecord.app.core.ui.theme.BlossomPink
 import com.dietrecord.app.core.ui.theme.CocoaBrown
 import com.dietrecord.app.core.ui.theme.CreamWhite
@@ -51,149 +53,204 @@ import com.dietrecord.app.feature.recognize.RecognizeResultViewModel
  */
 @Composable
 fun AppNavHost() {
-    val navController = rememberNavController()
     val appContainer = (LocalContext.current.applicationContext as DietRecordApp).container
     val refreshVersion by appContainer.refreshCoordinator.mutationVersion.collectAsState()
-    val topLevelDestinations = listOf(
-        AppDestination.Home,
-        AppDestination.Camera,
-        AppDestination.Goal
+    val homeViewModel: HomeViewModel = viewModel(factory = appContainer.homeViewModelFactory())
+    val homeUiState by homeViewModel.uiState.collectAsState()
+    val cameraViewModel: CameraViewModel = viewModel(factory = appContainer.cameraViewModelFactory())
+    val cameraUiState by cameraViewModel.uiState.collectAsState()
+    val goalViewModel: GoalViewModel = viewModel(factory = appContainer.goalViewModelFactory())
+    val goalUiState by goalViewModel.uiState.collectAsState()
+    val recognizeViewModel: RecognizeResultViewModel = viewModel(
+        factory = appContainer.recognizeResultViewModelFactory()
     )
+    val recognizeUiState by recognizeViewModel.uiState.collectAsState()
+
+    var currentTopLevelRoute by rememberSaveable { mutableStateOf(AppDestination.Home.route) }
+    var currentOverlayRoute by rememberSaveable { mutableStateOf<String?>(null) }
+    var lastHandledHomeRefreshVersion by rememberSaveable { mutableLongStateOf(-1L) }
+    var lastHandledGoalRefreshVersion by rememberSaveable { mutableLongStateOf(-1L) }
+    var cameraCaptureRequestId by rememberSaveable { mutableStateOf(0) }
+    var isCameraCapturePending by rememberSaveable { mutableStateOf(false) }
+
+    fun navigateTopLevel(destination: AppDestination) {
+        currentOverlayRoute = null
+        currentTopLevelRoute = destination.route
+        if (destination != AppDestination.Camera) {
+            cameraCaptureRequestId = 0
+            isCameraCapturePending = false
+            cameraViewModel.clearError()
+        }
+    }
+
+    fun openCameraFeature() {
+        currentOverlayRoute = null
+        cameraViewModel.clearError()
+        cameraCaptureRequestId = 0
+        currentTopLevelRoute = AppDestination.Camera.route
+        isCameraCapturePending = false
+    }
+
+    LaunchedEffect(currentTopLevelRoute, currentOverlayRoute) {
+        if (currentOverlayRoute != null) {
+            return@LaunchedEffect
+        }
+        when (currentTopLevelRoute) {
+            AppDestination.Home.route -> {
+                homeViewModel.refresh()
+                lastHandledHomeRefreshVersion = refreshVersion
+            }
+
+            AppDestination.Goal.route -> {
+                goalViewModel.refresh()
+                lastHandledGoalRefreshVersion = refreshVersion
+            }
+        }
+    }
+
+    LaunchedEffect(refreshVersion, currentTopLevelRoute, currentOverlayRoute) {
+        if (currentOverlayRoute != null) {
+            return@LaunchedEffect
+        }
+        when (currentTopLevelRoute) {
+            AppDestination.Home.route -> {
+                if (refreshVersion > lastHandledHomeRefreshVersion) {
+                    homeViewModel.refresh()
+                    lastHandledHomeRefreshVersion = refreshVersion
+                }
+            }
+
+            AppDestination.Goal.route -> {
+                if (refreshVersion > lastHandledGoalRefreshVersion) {
+                    goalViewModel.refresh(preserveSuccessMessage = true)
+                    lastHandledGoalRefreshVersion = refreshVersion
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(currentTopLevelRoute, isCameraCapturePending, cameraUiState.isRecognizing, cameraUiState.errorMessage) {
+        val leftCameraFlow = currentTopLevelRoute != AppDestination.Camera.route
+        if (leftCameraFlow || cameraUiState.isRecognizing || cameraUiState.errorMessage != null) {
+            isCameraCapturePending = false
+        }
+    }
 
     AppBackground {
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                val backStackEntry by navController.currentBackStackEntryAsState()
-                val currentDestination = backStackEntry?.destination
+                if (currentOverlayRoute != AppDestination.Recognize.route) {
+                    val cameraSelected = currentTopLevelRoute == AppDestination.Camera.route
+                    val homeSelected = currentTopLevelRoute == AppDestination.Home.route
+                    val goalSelected = currentTopLevelRoute == AppDestination.Goal.route
+                    val isCameraLoading = isCameraCapturePending || cameraUiState.isRecognizing
 
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = CreamWhite.copy(alpha = 0.95f),
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                    shadowElevation = 12.dp,
-                    border = BorderStroke(1.dp, RibbonPink.copy(alpha = 0.28f))
-                ) {
-                    NavigationBar(
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        containerColor = Color.Transparent,
-                        tonalElevation = 0.dp
+                        color = CreamWhite.copy(alpha = 0.95f),
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                        shadowElevation = 12.dp,
+                        border = BorderStroke(1.dp, RibbonPink.copy(alpha = 0.28f))
                     ) {
-                        topLevelDestinations.forEach { destination ->
-                            val selected = currentDestination?.hierarchy?.any { it.route == destination.route } == true
-                            NavigationBarItem(
-                                selected = selected,
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 18.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            BottomNavTab(
+                                destination = AppDestination.Home,
+                                selected = homeSelected,
+                                modifier = Modifier.weight(1f),
+                                onClick = { navigateTopLevel(AppDestination.Home) }
+                            )
+                            CameraNavButton(
+                                selected = cameraSelected,
+                                isLoading = isCameraLoading,
+                                modifier = Modifier.weight(1f),
                                 onClick = {
-                                    navController.navigate(destination.route) {
-                                        launchSingleTop = true
-                                        restoreState = true
-                                        popUpTo(navController.graph.startDestinationId) {
-                                            saveState = true
+                                    if (cameraSelected) {
+                                        if (!isCameraLoading) {
+                                            cameraViewModel.clearError()
+                                            recognizeViewModel.prepareForNewRecognition()
+                                            currentOverlayRoute = AppDestination.Recognize.route
+                                            isCameraCapturePending = true
+                                            cameraCaptureRequestId += 1
                                         }
+                                    } else {
+                                        openCameraFeature()
                                     }
-                                },
-                                alwaysShowLabel = true,
-                                icon = {
-                                    BottomNavIcon(destination = destination, selected = selected)
-                                },
-                                label = {
-                                    Text(text = destination.label)
-                                },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = BlossomPink,
-                                    selectedTextColor = BlossomPink,
-                                    unselectedIconColor = CocoaBrown.copy(alpha = 0.42f),
-                                    unselectedTextColor = CocoaBrown.copy(alpha = 0.52f),
-                                    indicatorColor = BlossomPink.copy(alpha = 0.1f)
-                                )
+                                }
+                            )
+                            BottomNavTab(
+                                destination = AppDestination.Goal,
+                                selected = goalSelected,
+                                modifier = Modifier.weight(1f),
+                                onClick = { navigateTopLevel(AppDestination.Goal) }
                             )
                         }
                     }
                 }
             }
         ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = AppDestination.Home.route,
-                modifier = Modifier.padding(innerPadding)
+            Box(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize()
             ) {
-                composable(AppDestination.Home.route) { backStackEntry ->
-                    val homeViewModel: HomeViewModel = viewModel(factory = appContainer.homeViewModelFactory())
-                    val homeUiState by homeViewModel.uiState.collectAsState()
-                    AppDestinationRefreshEffect(
-                        navigationEntry = backStackEntry,
-                        refreshVersion = refreshVersion,
-                        onEnterRefresh = homeViewModel::refresh
-                    )
-                    HomeScreen(
-                        uiState = homeUiState,
-                        onOpenCamera = { navController.navigate(AppDestination.Camera.route) },
-                        onOpenGoal = { navController.navigate(AppDestination.Goal.route) }
-                    )
+                when (currentTopLevelRoute) {
+                    AppDestination.Camera.route -> {
+                        CameraScreen(
+                            uiState = cameraUiState,
+                            captureRequestId = cameraCaptureRequestId,
+                            previewVisible = currentOverlayRoute != AppDestination.Recognize.route,
+                            onRecognize = cameraViewModel::recognizeCapturedPhoto,
+                            onDismissError = cameraViewModel::clearError,
+                            onCaptureError = cameraViewModel::reportError
+                        )
+                    }
+
+                    AppDestination.Goal.route -> {
+                        GoalScreen(
+                            uiState = goalUiState,
+                            onCurrentWeightChange = goalViewModel::updateCurrentWeight,
+                            onTargetWeightChange = goalViewModel::updateTargetWeight,
+                            onDailyLimitChange = goalViewModel::updateDailyLimit,
+                            onSave = goalViewModel::saveGoal,
+                            onNavigateBack = {
+                                navigateTopLevel(AppDestination.Home)
+                            }
+                        )
+                    }
+
+                    else -> {
+                        HomeScreen(
+                            uiState = homeUiState,
+                            onOpenCamera = ::openCameraFeature,
+                            onOpenGoal = { navigateTopLevel(AppDestination.Goal) }
+                        )
+                    }
                 }
 
-                composable(AppDestination.Camera.route) {
-                    val cameraViewModel: CameraViewModel = viewModel(factory = appContainer.cameraViewModelFactory())
-                    val cameraUiState by cameraViewModel.uiState.collectAsState()
-                    CameraScreen(
-                        uiState = cameraUiState,
-                        onRecognize = cameraViewModel::recognizeCapturedPhoto,
-                        onConsumeNavigation = {
-                            cameraViewModel.onNavigationHandled()
-                            navController.navigate(AppDestination.Recognize.route)
-                        },
-                        onDismissError = cameraViewModel::clearError,
-                        onCaptureError = cameraViewModel::reportError
-                    )
-                }
-
-                composable(AppDestination.Recognize.route) {
-                    val recognizeViewModel: RecognizeResultViewModel = viewModel(
-                        factory = appContainer.recognizeResultViewModelFactory()
-                    )
-                    val recognizeUiState by recognizeViewModel.uiState.collectAsState()
+                if (currentOverlayRoute == AppDestination.Recognize.route) {
                     RecognizeResultScreen(
                         uiState = recognizeUiState,
+                        isRecognitionPending = isCameraCapturePending || cameraUiState.isRecognizing,
+                        recognitionErrorMessage = cameraUiState.errorMessage,
                         onSave = recognizeViewModel::saveRecord,
+                        onRetake = {
+                            recognizeViewModel.prepareForNewRecognition()
+                            cameraViewModel.clearError()
+                            cameraCaptureRequestId = 0
+                            isCameraCapturePending = false
+                            currentOverlayRoute = null
+                            currentTopLevelRoute = AppDestination.Camera.route
+                        },
                         onConsumeNavigation = {
                             recognizeViewModel.onNavigationHandled()
-                            navController.navigate(AppDestination.Home.route) {
-                                popUpTo(navController.graph.startDestinationId) {
-                                    saveState = false
-                                }
-                                launchSingleTop = true
-                                restoreState = false
-                            }
-                        },
-                        onToggleSimulateFailure = recognizeViewModel::toggleSimulateNextFailure
-                    )
-                }
-
-                composable(AppDestination.Goal.route) { backStackEntry ->
-                    val goalViewModel: GoalViewModel = viewModel(factory = appContainer.goalViewModelFactory())
-                    val goalUiState by goalViewModel.uiState.collectAsState()
-                    AppDestinationRefreshEffect(
-                        navigationEntry = backStackEntry,
-                        refreshVersion = refreshVersion,
-                        onEnterRefresh = goalViewModel::refresh,
-                        onMutationRefresh = { goalViewModel.refresh(preserveSuccessMessage = true) }
-                    )
-                    GoalScreen(
-                        uiState = goalUiState,
-                        onCurrentWeightChange = goalViewModel::updateCurrentWeight,
-                        onTargetWeightChange = goalViewModel::updateTargetWeight,
-                        onDailyLimitChange = goalViewModel::updateDailyLimit,
-                        onSave = goalViewModel::saveGoal,
-                        onNavigateBack = {
-                            val popped = navController.popBackStack()
-                            if (!popped) {
-                                navController.navigate(AppDestination.Home.route) {
-                                    launchSingleTop = true
-                                    popUpTo(navController.graph.startDestinationId) {
-                                        saveState = true
-                                    }
-                                }
-                            }
+                            currentOverlayRoute = null
+                            navigateTopLevel(AppDestination.Home)
                         }
                     )
                 }
@@ -203,11 +260,90 @@ fun AppNavHost() {
 }
 
 @Composable
+private fun BottomNavTab(
+    destination: AppDestination,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        BottomNavIcon(destination = destination, selected = selected)
+        Text(
+            text = destination.label,
+            modifier = Modifier.padding(top = 4.dp),
+            color = if (selected) BlossomPink else CocoaBrown.copy(alpha = 0.52f)
+        )
+    }
+}
+
+@Composable
+private fun CameraNavButton(
+    selected: Boolean,
+    isLoading: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        BottomNavIcon(
+            destination = AppDestination.Camera,
+            selected = selected,
+            isCameraLoading = isLoading
+        )
+        Text(
+            text = AppDestination.Camera.label,
+            modifier = Modifier.padding(top = 4.dp),
+            color = if (selected || isLoading) BlossomPink else CocoaBrown.copy(alpha = 0.52f)
+        )
+    }
+}
+
+@Composable
 private fun BottomNavIcon(
     destination: AppDestination,
-    selected: Boolean
+    selected: Boolean,
+    isCameraLoading: Boolean = false
 ) {
-    if (destination == AppDestination.Home && selected) {
+    if (destination == AppDestination.Camera) {
+        val containerColor = if (selected || isCameraLoading) BlossomPink else CreamWhite
+        val border = if (selected || isCameraLoading) null else BorderStroke(1.dp, RibbonPink.copy(alpha = 0.35f))
+        val contentColor = if (selected || isCameraLoading) CreamWhite else CocoaBrown.copy(alpha = 0.62f)
+
+        Surface(
+            modifier = Modifier.size(52.dp),
+            color = containerColor,
+            contentColor = contentColor,
+            shape = CircleShape,
+            shadowElevation = if (selected || isCameraLoading) 10.dp else 4.dp,
+            border = border
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                if (isCameraLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = contentColor,
+                        trackColor = contentColor.copy(alpha = 0.22f),
+                        strokeWidth = 2.2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = destination.requireIcon(),
+                        contentDescription = destination.label,
+                        tint = contentColor
+                    )
+                }
+            }
+        }
+    } else if (destination == AppDestination.Home && selected) {
         Box(
             modifier = Modifier.size(32.dp),
             contentAlignment = Alignment.Center
@@ -224,7 +360,8 @@ private fun BottomNavIcon(
     } else {
         Icon(
             imageVector = destination.requireIcon(),
-            contentDescription = destination.label
+            contentDescription = destination.label,
+            tint = if (selected) BlossomPink else CocoaBrown.copy(alpha = 0.62f)
         )
     }
 }

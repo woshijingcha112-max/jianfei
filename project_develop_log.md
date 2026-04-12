@@ -1,5 +1,197 @@
 # Project Develop Log
 
+## 2026-04-13 / 喵呜桌面图标与演示 APK 交付
+### 本次主要完成内容
+
+- 将用户提供的猫爪 PNG 生成 Android launcher icon 资源，并接入 `AndroidManifest.xml` 的 `android:icon / android:roundIcon`。
+- 将应用桌面显示名从“减肥记录”改为“喵呜”。
+- 重新构建面向远端后端 `http://124.221.144.48:8080/` 的 Debug APK，并额外导出同目录演示包 `android/app/build/outputs/apk/debug/喵呜.apk`。
+- 已将新 APK 安装并启动到真机 `192.168.5.7:35897`，用于用户演示。
+
+### 本次验证结果
+
+- `powershell -ExecutionPolicy Bypass -File scripts/backend-mvn.ps1 -DskipTests package`：通过
+- `$env:JAVA_HOME=...; $env:ANDROID_HOME=...; $env:API_BASE_URL='http://124.221.144.48:8080/'; android\gradlew.bat :app:assembleDebug`：通过
+- `adb -s 192.168.5.7:35897 install --no-streaming -r android/app/build/outputs/apk/debug/app-debug.apk`：成功
+- `adb -s 192.168.5.7:35897 shell monkey -p com.dietrecord.app -c android.intent.category.LAUNCHER 1`：成功
+- `aapt dump badging android/app/build/outputs/apk/debug/app-debug.apk`：确认 `application-label='喵呜'` 且 launcher icon 已写入各密度资源
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 智谱视觉模型切换为 glm-4.6v
+### 本次主要完成内容
+
+- 后端智谱视觉模型从 `glm-5v-turbo` 切换为 `glm-4.6v`。
+- 同步更新了运行配置、示例配置与 `AppProperties` 默认值，避免不同入口模型名不一致。
+- 将 `Glm46VAdaptiveRecognitionDemoTest` 收口为单独的智谱 smoke test，不再依赖环境变量，也不再依赖百度校验链路。
+
+### 本次验证结果
+
+- `powershell -ExecutionPolicy Bypass -File scripts/backend-mvn.ps1 -Dtest=Glm46VAdaptiveRecognitionDemoTest test`：通过
+- 实测日志显示智谱接口 `httpStatus=200`
+- 实测日志显示 `model=glm-4.6v`
+- 实测识别返回 `recognizedItemCount=8`
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 识别结果页被相机预览遮挡修复
+### 本次主要完成内容
+
+- 修复二次点击拍照后结果页已切入但视觉上仍停留在拍摄界面的问题。
+- 根因是 `PreviewView` 属于原生视图层，切入结果页时仍然覆盖在 Compose 结果页之上。
+- 现在结果页打开时会立即隐藏相机预览视图，但识别异步流程继续执行；因此视觉上会立刻进入识别结果页并显示 loading。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 相机残留请求号清理
+### 本次主要完成内容
+
+- 修复从首页再次进入拍照页时偶发直接拍照的问题。
+- 进入拍照页、离开拍照流、重新拍照返回相机时，都会重置旧的拍照请求号，避免把上一轮请求误当成新请求消费。
+- 相机页内部的“已消费请求号”改为普通内存态，不再跟随页面恢复持久化。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 识别结果页即时切入与底部悬浮双按钮
+### 本次主要完成内容
+
+- 在拍照页内点击底部拍照按钮后，结果页立即覆盖显示，不再等待后端响应后才跳转。
+- 结果页等待后端期间改为菜单级 loading；后端返回后直接替换为识别内容，失败则原位显示错误。
+- 识别结果页展示时隐藏底部导航，避免页面仍然表现得像拍照页。
+- 删除结果页无用的模拟失败按钮，改为底部悬浮双按钮：左侧浅绿色“确认保存”，右侧红色“重新拍照”。
+- 相机页不再承担跳转结果页职责，只负责拍照；识别结果页切换由导航层控制，避免旧事件反复干扰。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 拍照后立刻跳转识别结果页
+### 本次主要完成内容
+
+- 底部拍照按钮在拍照页内点击后，已改为立即进入识别结果页，不再等后端返回后才跳转。
+- 识别结果页新增“识别中”状态，等待后端返回期间在明细区域展示菜单级 loading 占位。
+- 新一轮拍照前会先清空上一轮识别结果，避免结果页瞬间闪出旧数据。
+- 识别结果页容器改为独立背景，避免覆盖在相机预览上时露出底图。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+- `android\gradlew.bat :app:assembleDebug -PAPI_BASE_URL=http://124.221.144.48:8080/`：通过
+- `scripts/deploy-android-debug.ps1 -SkipBuild -DeviceSerial 192.168.5.7:35897 -Launch`：安装成功并已启动到真机
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 拍照入口改为纯二态切换
+### 本次主要完成内容
+
+- 已删除拍照按钮的假 loading。
+- 当前页面不是拍照页时，点击底部拍照按钮只进入拍照页。
+- 当前页面已经是拍照页时，点击底部拍照按钮才触发真实拍照与识别上传。
+- 保持拍照页实时取景与顶层页面隔离逻辑不变。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 首页-拍照-目标顶层隔离与拍照假 loading 缩短
+### 本次主要完成内容
+
+- 已将 `Home / Camera / Goal` 从共享导航栈切换改为顶层独立状态切换，避免首页、拍照页、目标页互相残留或串位。
+- 识别结果页继续保留为拍照流上的单独覆盖层，不再作为顶层 tab 参与切换。
+- 拍照入口的假 loading 从 1 秒缩短到 300ms；拍照页仍保持实时取景，识别等待期间不再锁死画面。
+- 相机预览容器补了边界裁剪，减少 `PreviewView` 越界覆盖底栏点击区域的风险。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+- `android\gradlew.bat :app:assembleDebug -PAPI_BASE_URL=http://124.221.144.48:8080/`：通过
+- `scripts/deploy-android-debug.ps1 -SkipBuild -DeviceSerial 192.168.5.7:35897 -Launch`：安装成功并已启动到真机
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 拍照导航串位修复与取景持续显示
+### 本次主要完成内容
+
+- 已把底部导航从 `NavigationBarItem` 结构改为自绘三段式按钮，修复首页/拍照按钮点击串位问题。
+- 已保留“第一次进入拍照只开预览，第二次点击圆形拍照按钮才真实拍照上传”的两段式交互。
+- 已移除拍照页全屏 loading 遮罩，识别等待期间继续保留实时取景画面，只在底部圆形拍照按钮上展示 loading。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+- `android\gradlew.bat :app:assembleDebug -PAPI_BASE_URL=http://124.221.144.48:8080/`：通过
+- `scripts/deploy-android-debug.ps1 -SkipBuild -DeviceSerial 192.168.5.7:35897 -Launch`：安装成功并启动成功
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 拍照导航改为两段式触发与整屏预览
+### 本次主要完成内容
+
+- 底部导航中间“拍照”按钮已改为圆形视觉。
+- 从其他导航进入拍照页时，当前只拉起相机预览，不会直接拍照上传；拍照按钮会先做 1 秒假 loading。
+- 仅当用户已在拍照页再次点击底部拍照按钮时，才会真正触发拍照并上传识别。
+- 拍照页已去掉页头、卡片边框和“实时取景”文案，拍照页主体改为整屏相机预览。
+
+### 本次验证结果
+
+- `android\gradlew.bat :app:compileDebugKotlin`：通过
+- `android\gradlew.bat :app:assembleDebug -PAPI_BASE_URL=http://124.221.144.48:8080/`：通过
+- `scripts/deploy-android-debug.ps1 -SkipBuild -DeviceSerial 192.168.5.7:35897 -Launch`：安装成功并启动成功
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-13 / 远端智谱识别启用与配置收口
+### 本次主要完成内容
+
+- 已将后端智谱识别 `api-key` 从环境变量读取改为直写在 `application.yml`。
+- 已把智谱默认识别 prompt 从 `ZhipuPhotoAiProvider` 中的默认常量下沉到 `application.yml`，避免运行关键配置散落在代码里。
+- 已重新打包后端 jar，上传并替换远端 `/opt/diet-app/diet-record-backend.jar`，并重启 `diet-app` 服务。
+
+### 本次验证结果
+
+- `powershell -ExecutionPolicy Bypass -File scripts/backend-mvn.ps1 -DskipTests package`：通过
+- 远端 `systemctl restart diet-app` 后状态为 `active`
+- 使用真实测试图调用 `POST http://124.221.144.48:8080/diet/photo/upload`：成功
+- 远端日志确认：
+  - `ZhipuPhotoAiProvider` 返回 `httpStatus=200`
+  - `AdaptivePhotoAiRecognitionClient` 日志为 `mainProvider=zhipu, effectiveProvider=zhipu`
+
+### 是否需要更新 spec
+
+- 否
+
 ## 2026-04-13 / 首页圆环尺寸微调
 ### 本次主要完成内容
 

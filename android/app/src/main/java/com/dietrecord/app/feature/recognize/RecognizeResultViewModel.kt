@@ -51,6 +51,19 @@ class RecognizeResultViewModel(
         }
     }
 
+    fun prepareForNewRecognition() {
+        _uiState.value = _uiState.value.copy(
+            items = emptyList(),
+            isSaving = false,
+            errorMessage = null,
+            successMessage = null,
+            navigateHome = false
+        )
+        viewModelScope.launch {
+            recognitionRepository.clearCurrentRecognition()
+        }
+    }
+
     fun toggleSimulateNextFailure() {
         Log.d(TAG, "切换识别结果保存失败模拟开关，当前=${!_uiState.value.simulateNextFailure}")
         _uiState.value = _uiState.value.copy(
