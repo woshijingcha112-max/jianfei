@@ -34,6 +34,6 @@ app:
         enabled: true
         endpoint: https://open.bigmodel.cn/api/paas/v4/chat/completions
         api-key: replace_me
-        model: glm-5v-turbo
+        model: glm-4.6v
         max-tokens: 2048
         temperature: 0.1

@@ -250,7 +250,7 @@ public class AppProperties {
         private boolean enabled = true;
         private String endpoint = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
         private String apiKey = "";
-        private String model = "glm-5v-turbo";
+        private String model = "glm-4.6v";
         private int maxTokens = 2048;
         private double temperature = 0.1d;
         private String prompt = "";

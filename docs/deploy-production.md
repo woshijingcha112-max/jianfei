@@ -10,7 +10,7 @@
 - 服务器系统版本
 - MySQL 是否已经安装；如果已安装，需要提供库名、用户名、临时密码和连接地址
 - 公网访问方式：直接开放 `8080`，还是走域名 + Nginx 反代到 `127.0.0.1:8080`
-- 智谱 API Key：用于 `PHOTO_AI_ZHIPU_API_KEY`
+- 智谱 API Key：当前已按运行态需求直写在 `backend/src/main/resources/application.yml`，不再通过环境变量注入
 
 连接完成后，你再修改服务器密码。
 
@@ -53,8 +53,6 @@ export DB_PASSWORD='替换为远端数据库密码'
 export UPLOAD_ROOT='/opt/diet-app/uploads'
 export UPLOAD_ACCESS_PREFIX='/uploads'
 export LOG_DIR='/var/log/diet-app'
-export PHOTO_AI_ZHIPU_API_KEY='替换为真实密钥'
-
 java -jar /opt/diet-app/diet-record-backend.jar
 ```
 
