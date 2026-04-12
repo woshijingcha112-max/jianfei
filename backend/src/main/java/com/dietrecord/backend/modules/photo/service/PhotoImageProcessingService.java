@@ -66,9 +66,11 @@ public class PhotoImageProcessingService {
         log.info("开始处理上传图片，文件名={}，原始大小={}字节，宽={}，高={}",
                 originalFilename, originalBytes.length, width, height);
 
+        int minDimension = appProperties.getPhoto().getImage().getMinDimension();
         boolean withinSize = originalBytes.length <= appProperties.getPhoto().getImage().getPreserveMaxBytes();
-        boolean withinDimension = Math.max(width, height) <= appProperties.getPhoto().getImage().getMaxDimension();
-        if (withinSize && withinDimension) {
+        boolean withinMaxDimension = Math.max(width, height) <= appProperties.getPhoto().getImage().getMaxDimension();
+        boolean withinMinDimension = Math.min(width, height) >= minDimension;
+        if (withinSize && withinMaxDimension && withinMinDimension) {
             log.info("图片满足直传条件，无需压缩，文件名={}", originalFilename);
             return new ProcessedPhoto(
                     originalBytes,
@@ -83,9 +85,13 @@ public class PhotoImageProcessingService {
             );
         }
 
-        // 先按最大边约束缩放，再根据目标大小继续递减尺寸。
+        // 先把图片尺寸收口到百度可接受范围，再根据目标体积继续压缩。
         boolean hasAlpha = sourceImage.getColorModel().hasAlpha();
-        BufferedImage resizedImage = resizeIfNeeded(sourceImage, appProperties.getPhoto().getImage().getMaxDimension());
+        BufferedImage resizedImage = normalizeDimension(
+                sourceImage,
+                appProperties.getPhoto().getImage().getMinDimension(),
+                appProperties.getPhoto().getImage().getMaxDimension()
+        );
         String outputFormat = chooseOutputFormat(originalFormat, hasAlpha);
         byte[] encodedBytes = encodeImage(resizedImage, outputFormat, appProperties.getPhoto().getImage().getJpegQuality());
         long targetMaxBytes = appProperties.getPhoto().getImage().getCompressedTargetMaxBytes();
@@ -129,22 +135,38 @@ public class PhotoImageProcessingService {
         }
     }
 
-    private BufferedImage resizeIfNeeded(BufferedImage image, int maxDimension) {
+    private BufferedImage normalizeDimension(BufferedImage image, int minDimension, int maxDimension) {
         int width = image.getWidth();
         int height = image.getHeight();
+        BufferedImage normalizedImage = image;
+
+        int currentMin = Math.min(width, height);
+        if (currentMin < minDimension) {
+            double upscale = (double) minDimension / currentMin;
+            int targetWidth = Math.max(1, (int) Math.round(width * upscale));
+            int targetHeight = Math.max(1, (int) Math.round(height * upscale));
+            normalizedImage = resizeToExact(normalizedImage, targetWidth, targetHeight);
+            width = normalizedImage.getWidth();
+            height = normalizedImage.getHeight();
+        }
+
         int currentMax = Math.max(width, height);
         if (currentMax <= maxDimension) {
-            return image;
+            return normalizedImage;
         }
-        double scale = (double) maxDimension / currentMax;
-        int targetWidth = Math.max(1, (int) Math.round(width * scale));
-        int targetHeight = Math.max(1, (int) Math.round(height * scale));
-        return resizeToExact(image, targetWidth, targetHeight);
+
+        double downscale = (double) maxDimension / currentMax;
+        int targetWidth = Math.max(1, (int) Math.round(width * downscale));
+        int targetHeight = Math.max(1, (int) Math.round(height * downscale));
+        return resizeToExact(normalizedImage, targetWidth, targetHeight);
     }
 
     private BufferedImage resizeToExact(BufferedImage source, int targetWidth, int targetHeight) {
-        BufferedImage target = new BufferedImage(targetWidth, targetHeight,
-                source.getColorModel().hasAlpha() ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB);
+        BufferedImage target = new BufferedImage(
+                targetWidth,
+                targetHeight,
+                source.getColorModel().hasAlpha() ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB
+        );
         Graphics2D graphics = target.createGraphics();
         try {
             graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);

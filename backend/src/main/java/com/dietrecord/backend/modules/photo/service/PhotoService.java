@@ -1,13 +1,14 @@
 package com.dietrecord.backend.modules.photo.service;
 
+import com.dietrecord.backend.modules.photo.model.internal.PhotoRecognitionOutcome;
 import com.dietrecord.backend.modules.photo.model.internal.ProcessedPhoto;
-import com.dietrecord.backend.modules.photo.model.vo.PhotoRecognitionItemVO;
+import com.dietrecord.backend.modules.photo.model.vo.PhotoStructuredResultVO;
 import com.dietrecord.backend.modules.photo.model.vo.PhotoUploadVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
+import java.time.Duration;
 
 /**
  * 拍照识别主流程服务。
@@ -29,6 +30,7 @@ public class PhotoService {
     }
 
     public PhotoUploadVO uploadAndRecognize(MultipartFile file) {
+        long startNanos = System.nanoTime();
         log.info("开始执行拍照识别主流程，原始文件名={}", file.getOriginalFilename());
 
         // 先处理图片尺寸和格式，确保后续落盘与识别使用统一输入。
@@ -38,10 +40,25 @@ public class PhotoService {
         String photoUrl = photoStorageService.store(processedPhoto);
 
         // 最后执行识别并返回结果页所需数据。
-        List<PhotoRecognitionItemVO> recognizedItems = photoRecognitionService.recognize(processedPhoto);
+        PhotoRecognitionOutcome recognitionOutcome = photoRecognitionService.recognize(processedPhoto, photoUrl);
 
-        log.info("拍照识别主流程完成，文件名={}，压缩后大小={}字节，识别结果数={}",
-                processedPhoto.originalFilename(), processedPhoto.sizeBytes(), recognizedItems.size());
-        return new PhotoUploadVO(photoUrl, recognizedItems);
+        long elapsedMs = Duration.ofNanos(System.nanoTime() - startNanos).toMillis();
+        log.info("拍照识别主流程完成，文件名={}，压缩后大小={}字节，recognizedItems={}，structuredDish={}，elapsedMs={}",
+                processedPhoto.originalFilename(),
+                processedPhoto.sizeBytes(),
+                recognitionOutcome.recognizedItems().size(),
+                extractStructuredDishName(recognitionOutcome),
+                elapsedMs);
+        return new PhotoUploadVO(photoUrl, recognitionOutcome.recognizedItems(), recognitionOutcome.structuredResult());
+    }
+
+    private String extractStructuredDishName(PhotoRecognitionOutcome recognitionOutcome) {
+        if (recognitionOutcome == null || recognitionOutcome.structuredResult() == null
+                || recognitionOutcome.structuredResult().recognitionPayload() == null) {
+            return "";
+        }
+        PhotoStructuredResultVO.WholeDishInfo wholeDishInfo =
+                recognitionOutcome.structuredResult().recognitionPayload().wholeDishInfo();
+        return wholeDishInfo == null ? "" : wholeDishInfo.dishName();
     }
 }

@@ -39,11 +39,12 @@ public class GoalServiceImpl implements GoalService {
 
     @Override
     public void saveGoal(GoalSaveDTO request) {
-        log.info("开始保存目标设置，目标体重={}，热量目标={}",
-                request.getTargetWeight(), request.getDailyCalLimit());
+        log.info("开始保存目标设置，当前体重={}，目标体重={}，热量目标={}",
+                request.getCurrentWeight(), request.getTargetWeight(), request.getDailyCalLimit());
 
         // 先加载固定用户档案，再在当前档案上覆盖可编辑字段。
         UserProfilePO userProfile = loadUserProfile();
+        userProfile.setWeightKg(request.getCurrentWeight());
         userProfile.setTargetWeight(request.getTargetWeight());
         userProfile.setDailyCalLimit(request.getDailyCalLimit());
 

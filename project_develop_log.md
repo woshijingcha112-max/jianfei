@@ -1,5 +1,644 @@
 # Project Develop Log
 
+## 2026-04-12 / 首页总览卡二次收口与真机重新部署
+### 本次主要完成内容
+
+- 已根据真机截图继续收口首页总览卡的自适应阈值，修正第一轮方案在较宽手机竖屏下仍偏乐观的问题：
+  - 首页外层横向 padding 的紧凑档位从 `<= 360dp` 放宽到 `<= 412dp`
+  - 总览卡最外层粉色容器在手机竖屏下同步改用更小的外边距
+  - 指标区不再只按总宽度 `< 320dp` 切单列，而是按“单个指标卡估算宽度”判断；当估算宽度不足或字体缩放偏大时，直接改为单列
+- 已将单列指标块显式拉满可用宽度，避免堆叠后仍保留过窄卡片宽度
+- 已将进度条区域的紧凑布局判断和指标区保持一致，避免总览卡上半区与下半区收口尺度不一致
+- 已重新构建并重新安装最新 `Debug APK` 到无线调试设备 `192.168.5.7:35897`
+- 已重新建立 `adb reverse tcp:8080 tcp:8080` 并重新启动应用
+
+### 本次验证结果
+
+- 已执行 `android\gradlew.bat :app:compileDebugKotlin`，通过
+- 已执行 `android\gradlew.bat :app:assembleDebug`，通过
+- 已执行 `adb install --no-streaming -r`，安装成功
+- 已执行 `adb reverse tcp:8080 tcp:8080`，生效
+- 已执行应用启动命令，成功拉起 `com.dietrecord.app`
+
+### 本次暴露的缺陷或偏差
+
+- 当前首页展示出的目标热量 `19612` 与剩余值 `17867` 来自后端真实返回，不是前端本轮排版拼接导致；若该数字本身不符合预期，需要单独排查目标保存或后端统计口径
+- 无线调试场景下，配对端口与实际连接端口是两套信息；仅有六位数配对码不足以直接部署，仍需等 `_adb-tls-connect._tcp` 广播出真正连接端口
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 首页与底部导航竖屏自适应收口
+### 本次主要完成内容
+
+- 已将首页竖屏自适应收口到当前任务直接相关的首页与底部导航，不扩散到拍照页、目标页正文或全局设计系统。
+- 已调整首页外层与总览卡的横向间距策略：
+  - `screenWidthDp <= 360` 时首页外层横向 padding 收窄到 `16.dp`
+  - 总览卡内部内容区按紧凑宽度切换到更小的 `14.dp` 内边距和更紧的区块间距
+- 已将“已摄入 / 目标”指标区改为按组件实际可用宽度和字体缩放切布局：
+  - 指标容器宽度小于 `320.dp` 或 `fontScale >= 1.3f` 时自动切为单列堆叠
+  - 其他竖屏手机宽度下保持双列
+- 已修复指标卡内 `kcal` 被挤成竖排的问题：
+  - 指标值与单位改为单个富文本 `Text`
+  - 数字和单位用不同字阶渲染，但不再拆成两个横向 `Text` 抢宽度
+- 已同步收口总览卡内的标题和进度信息展示：
+  - 紧凑宽度下“今日总览”和指标值采用更小的局部字阶
+  - 进度条说明文本改为双侧分栏承载，避免窄屏下相互挤压
+  - 目标 badge 的偏移计算按更保守的宽度估算收口，避免贴边
+- 已将底部导航从自定义占位方块切回标准 Material3 导航：
+  - 使用 `NavigationBar + NavigationBarItem`
+  - 新增官方 Material icons extended 依赖
+  - 首页、拍照、目标分别接入 `Home / CameraAlt / Flag` 图标
+
+### 本次验证结果
+
+- 已执行 `android\gradlew.bat :app:compileDebugKotlin`，通过
+- 已执行 `android\gradlew.bat :app:assembleDebug`，通过
+
+### 本次暴露的缺陷或偏差
+
+- 当前仓库仍没有 Compose Preview、截图测试或 UI 自动化基线，本轮只能先用编译与打包通过作为机械验证，真机/模拟器的 `360dp / 393dp / 412dp + 字体缩放` 手工回归仍需后续补做
+- 当前构建依赖项目内 `tools/android-sdk`，在 Codex 沙箱内直接跑 Gradle 会因为 SDK 路径和本机 Gradle native library 加载受限而失败，需要在放宽权限后执行验证
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 首页、拍照、目标页去过程化文案与底部导航收口
+### 本次主要完成内容
+
+- 收窄三个核心页的顶部标题区：
+  - `AppPageHeader` 改为支持无副标题，减少顶部内边距与装饰高度
+  - 首页、拍照页、目标页均移除过程性副文案与页头角标
+- 收窄底部三栏导航：
+  - 去掉 tab 内部的“首 / 拍 / 目”文字方块
+  - 改为空白占位方框，保留底部文字标签，便于后续替换成 icon
+  - 同时整体降低导航高度与圆角厚重感
+- 清理三个页面中的实现过程文案：
+  - 首页移除“首页总览和记录列表……”“把关键数字收进一张……”以及 MySQL/联调类描述
+  - 拍照页移除 `/diet/photo/upload`、链路说明、失败模拟入口等调试/实现说明
+  - 目标页移除“保存后同步首页”“本轮范围”等说明与失败模拟入口
+- 简化主要操作按钮：
+  - 首页主按钮收口为“拍照记录”
+  - 目标页主按钮收口为“保存”
+  - 三页按钮不再展示 supporting text 与角标文字
+
+### 本次验证结果
+
+- 已执行 `android\gradlew.bat :app:compileDebugKotlin`，通过
+- 已执行 `android\gradlew.bat :app:assembleDebug`，通过
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 导航到达刷新机制收口
+### 本次主要完成内容
+
+- 已将首页与目标页原先依赖 `onResume` 的刷新方式收口为更稳定的通用机制：
+  - 新增应用级 `AppRefreshCoordinator`，只记录“成功修改版本号”
+  - 新增 `AppDestinationRefreshEffect`，目标页每次导航到达时刷新一次
+  - 若页面停留期间又收到新的成功修改版本，则当前页再刷新一次
+- 已将成功修改链路接入统一刷新版本：
+  - 目标保存成功后递增全局修改版本
+  - 识别结果保存成功后递增全局修改版本
+- 已将首页与目标页接到统一到达刷新机制，移除对 `AppOnResumeEffect` 的依赖
+- 目标页在本页保存成功后会保留成功提示，并立即刷新当前页数据；之后跳转到首页时，首页也会再次刷新
+
+### 本次约束说明
+
+- 本轮没有引入复杂导航结果传参或跨页业务对象同步，只保留轻量的全局修改版本号，避免过度设计
+- 识别结果页保存成功后仍按现有链路返回首页，不在结果页停留额外做复杂状态恢复
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 识别结果保存卡住排查与日志阻塞修复
+### 本次主要完成内容
+
+- 已根据 `2026-04-12 05:14:27` 真机日志确认：安卓端实际发出了 `POST /diet/record/save`，问题不是“前端未调用后端”。
+- 已通过 8080 端口 Java 进程线程栈定位根因：
+  - 当前监听 8080 的进程为 `com.dietrecord.backend.DietRecordApplication`
+  - `http-nio-8080-exec-*` 请求线程进入 `DietRecordServiceImpl.save()` 后，阻塞在首条 `log.info(...)`
+  - 具体卡点位于 Logback `ConsoleAppender` 向控制台 `FileOutputStream.writeBytes(...)` 写日志
+- 已调整后端日志配置：
+  - 新增滚动文件日志 `../tools/logs/backend-app.log`
+  - 控制台输出切到 `AsyncAppender`
+  - 文件输出保留同步落盘
+  - 控制台开启 `neverBlock=true`，避免控制台输出阻塞直接拖死接口线程
+
+### 本次暴露的缺陷或偏差
+
+- 当前后端核心请求链路仍把入口日志放在同步业务线程中，只要底层控制台输出阻塞，就会把接口吞住，表现为“客户端一直保存中、日志文件也看不到接口调用”。
+- 之前查看的 `tools/logs/backend-spring-boot-run.log` 不是运行中 8080 进程的可靠唯一日志出口，不能单靠它判断请求是否进入后端。
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 真机拍照识别超时排查与目标页当前体重可编辑修复
+
+### 本次主要完成内容
+
+- 已将智谱主识别调用从流式聚合改为非流式 `chat/completions`，避免后端持续收流但接口迟迟不收口。
+- 已补充拍照识别链路的前后端独立日志：
+  - 安卓端新增 `PhotoUpload` 上传日志，记录开始、接口返回、异常类型与耗时。
+  - `CameraViewModel` 新增拍照识别总耗时日志。
+  - 后端 `PhotoController / PhotoService / PhotoRecognitionService / ZhipuPhotoAiProvider` 新增接口总耗时、结构化菜名、识别条目数等摘要日志。
+- 已修复目标页“当前体重无法编辑”问题，并打通到后端保存：
+  - 前端目标页输入框取消只读。
+  - 安卓 `GoalSaveDTO` 新增 `currentWeight`。
+  - 后端 `GoalSaveDTO / GoalServiceImpl` 同步支持保存当前体重到 `user_profile.weight_kg`。
+- 已重新执行后端 `compile` 与安卓 `:app:assembleDebug`，均通过。
+
+### 本次暴露的缺陷或偏差
+
+- 真机调试包安装仍依赖本地 `adb` 访问宿主目录；当前 Codex 沙箱内直接执行安装命令会因为 `C:\\Users\\CodexSandboxOffline\\.android` 无权限而失败，需要在放宽权限后再执行一次真机安装。
+- 后端代码已经变更，但如果本机当前仍跑着旧进程，则必须重启后端后真机联调才会生效。
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 真机 Debug 部署脚本补充
+
+### 本次主要完成内容
+
+- 新增 `scripts/deploy-android-debug.ps1`，用于统一执行真机 Debug 部署。
+- 脚本默认执行：
+  - 构建安卓 Debug APK。
+  - 自动选择无线调试 TCP 设备。
+  - 安装 `android/app/build/outputs/apk/debug/app-debug.apk`。
+  - 自动建立 `adb reverse tcp:8080 tcp:8080`。
+- 已使用 `-SkipBuild` 验证脚本，安装成功并确认 reverse 列表包含 `host-25 tcp:8080 tcp:8080`。
+
+### 使用方式
+
+- 常规部署：`powershell -ExecutionPolicy Bypass -File scripts/deploy-android-debug.ps1`
+- 已经打包后只安装并建立 reverse：`powershell -ExecutionPolicy Bypass -File scripts/deploy-android-debug.ps1 -SkipBuild`
+- 指定设备：`powershell -ExecutionPolicy Bypass -File scripts/deploy-android-debug.ps1 -DeviceSerial 192.168.5.7:40277`
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 目标保存失败链路收口
+
+### 本次主要完成内容
+
+- 已根据真机日志定位目标保存失败根因：
+  - 安卓端 `/goal/save` 收到 HTTP 200。
+  - 业务响应实际是后端 `CannotGetJdbcConnectionException`。
+  - 后端默认数据库地址仍指向 `192.168.72.59:3306`，而当前本机可用 MySQL 是 `127.0.0.1:3306`。
+- 已将后端默认开发数据库配置切回本机 MySQL：
+  - `DB_URL` 默认值改为 `jdbc:mysql://127.0.0.1:3306/dev_cse_finance`
+  - `DB_USERNAME` 默认值改为 `root`
+  - `application-local.example.yml` 同步改成本机示例。
+- 已调整安卓目标保存仓储：
+  - `/goal/save` 成功后直接更新本地 `goalFlow`。
+  - 不再在保存成功后强制追加一次 `refreshGoal()`，避免“后端已保存，但后续刷新失败”误报成保存失败。
+  - 补充保存接口业务响应 `code/msg` 日志。
+- 已重新执行后端 `compile`、安卓 `:app:assembleDebug`，并通过部署脚本安装到真机且建立 `adb reverse tcp:8080 tcp:8080`。
+
+### 本次验证结果
+
+- 本机 MySQL 已确认可用：`user_profile id=1` 可查询到 `weight_kg=70.0 / target_weight=65.0 / daily_cal_limit=1500`。
+- 最新 Debug APK 已安装到真机。
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 部署脚本补充后端启动命令
+
+### 本次主要完成内容
+
+- 已在 `scripts/deploy-android-debug.ps1` 中补充后端启动命令输出：
+  - `powershell -ExecutionPolicy Bypass -File "D:\source\code\jianfei\scripts\backend-mvn.ps1" spring-boot:run`
+- 已新增 `-StartBackend` 参数：
+  - 默认不启动后端，只输出命令并继续执行安卓部署。
+  - 需要一键启动后端时，可执行 `powershell -ExecutionPolicy Bypass -File scripts/deploy-android-debug.ps1 -StartBackend`。
+- 已做 PowerShell 脚本语法检查，通过。
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 页面返回刷新机制通用化
+
+### 本次主要完成内容
+
+- 已定位“目标页返回首页后内容不刷新”的直接原因：
+  - `HomeViewModel` 之前只在 `init` 中拉取一次数据。
+  - 导航返回后复用旧 ViewModel，不会自动重新请求首页数据。
+- 已新增通用组件 `AppOnResumeEffect`：
+  - 位置：`android/app/src/main/java/com/dietrecord/app/core/ui/components/AppLifecycleEffects.kt`
+  - 作用：页面每次恢复到前台时统一触发回调。
+- 已将该通用机制接入：
+  - 首页：恢复时调用 `HomeViewModel.refresh()`
+  - 目标页：恢复时调用 `GoalViewModel.refresh()`
+- 已将首页与目标页的首刷逻辑从 `init` 转为公开 `refresh()`，避免后续新增页面时继续沿用“一次性初始化、不支持返回刷新”的模式。
+- 已执行安卓 `:app:assembleDebug`，通过。
+
+### 本次约束说明
+
+- 本轮只改通用刷新机制与页面数据重拉入口。
+- 未部署 APK 到真机。
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 真机网络基址切换
+
+### 本次主要完成内容
+
+- 已将安卓网络默认基址改为按运行环境区分：
+  - 模拟器继续使用 `10.0.2.2:8080`
+  - 真机改为通过 `adb reverse` 访问 `127.0.0.1:8080`
+- 这样可以避免真机继续访问模拟器专用地址，也绕开局域网入站和 Windows 防火墙问题。
+- 已将安卓端 `OkHttp` 超时策略调大：
+  - `connectTimeout = 20s`
+  - `readTimeout = 90s`
+  - `writeTimeout = 90s`
+  - `callTimeout = 90s`
+- 这样可以避免后端已进入 AI 识别但前端先因等待时间过短而主动超时。
+
+### 本次暴露的缺陷或偏差
+
+- 真机拍照失败并不是 CameraX 本身异常，而是上传识别阶段访问了错误地址。
+- 同时，本轮真机测试时本机后端未启动，也会导致上传链路失败。
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 拍照识别链路按 MVP 收口
+
+### 本次主要完成内容
+
+- 已将后端拍照识别运行链路收口为：`GLM-5V-Turbo` 主识别 + 本地 fallback。
+- 已保留百度菜品识别 provider 代码与配置结构，但默认关闭 `app.photo.ai.baidu.enabled`，当前不再发起实际百度调用。
+- 已在识别编排处补充中文注释，记录后续可演进方向：
+  - 百度主结果前置，优先给前端返回菜品级结果。
+  - 多模态继续负责食材级明细、重量和热量估算。
+- 本次未调整接口返回结构；`structuredResult` 中的校验信息在当前配置下会体现为“未执行百度校验”。
+
+### 本次未完成内容
+
+- 未把“百度主结果前置 + 多模态补明细”做成真实双阶段调用。
+- 未改安卓端去消费 `structuredResult`。
+
+### 本次暴露的缺陷或偏差
+
+- 之前文档把当前运行态写成了“智谱 + 百度校验 + 本地 fallback”三层并行执行，但这不再符合当前 MVP 收口后的真实状态。
+- 识别结果页当前仍主要依赖 `recognizedItems`，即便后端已返回 `structuredResult`，前端也不会直接展示食材级结构化信息。
+
+### 这些缺陷 / 未完成项将在第几步收口
+
+- 真机测试若确认当前单模型链路可接受，下一步优先完成安卓端端到端回归。
+- 若后续要优化首屏反馈，再把百度前置方案落成真实二段式或并行方案，而不是继续停留在注释层。
+
+### 是否需要更新 spec
+
+- 否
+
+### 备注
+
+- 本次调整是 MVP 收口，不是能力回退；百度接入代码仍保留，后续可按真实需求重新启用。
+
+## 2026-04-12 / GLM-4.6V 主识别接入与百度校验保留
+
+### 本次主要完成内容
+
+- 已将图片识别配置从单一百度参数重构为：
+  - 全局 `app.photo.ai.enabled / provider / timeout-millis / default-meal-type`
+  - `app.photo.ai.zhipu.*`
+  - `app.photo.ai.baidu.*`
+- 已按智谱官方 `GLM-4.6V` 文档完成后端接入：
+  - 调用入口为 `POST https://open.bigmodel.cn/api/paas/v4/chat/completions`
+  - 图片以 Base64 方式放入 `messages[].content[].image_url.url`
+  - 关闭 `thinking` 并下调 `max_tokens`，避免视觉结构化场景超时
+- 已把原有单类 `AdaptivePhotoAiRecognitionClient` 收敛为少量适配点结构：
+  - 新增 `PhotoAiProvider` 接口
+  - 新增 `ZhipuPhotoAiProvider`
+  - 新增 `BaiduDishPhotoAiProvider`
+  - `AdaptivePhotoAiRecognitionClient` 只负责主 provider 选择、百度校验、fallback 与统一结构化结果组装
+- 已新增统一结构化结果模型，并回写到上传接口：
+  - `/diet/photo/upload` 在原有 `photoUrl + recognizedItems` 基础上，新增 `structuredResult`
+  - 结构化字段已按本轮约定输出 `图片识别结果 / 整道菜信息 / 食材明细 / 汇总信息 / 校验信息`
+- 已修复一处百度历史兼容问题：
+  - 百度 `probability / calorie` 实际经常返回字符串，本轮已补数值字符串解析，不再丢失热量与置信度
+- 已新增 `Glm46VAdaptiveRecognitionDemoTest`
+  - 不进入 Spring 容器
+  - 不依赖数据库
+  - 直接用 `tools/picture` 下真实餐食图联调 `GLM-4.6V + 百度校验 + 结构化组装`
+
+### 本次验证结果
+
+- 已执行 `powershell -ExecutionPolicy Bypass -File scripts/backend-mvn.ps1 -DskipTests test-compile`
+  - 通过
+- 已执行 `powershell -ExecutionPolicy Bypass -File scripts/backend-mvn.ps1 -Dtest=Glm46VAdaptiveRecognitionDemoTest test`
+  - 通过
+- 真实图片联调结果：
+  - `GLM-4.6V` 主识别已成功返回 `麻辣烫`
+  - 返回的食材明细包含 `青菜 / 藕片 / 午餐肉 / 金针菇 / 豆腐 / 丸类 / 木耳 / 腐竹 / 培根`
+  - 百度校验仍返回 `麻辣烫`，置信度 `0.994832`
+  - 当前结构化汇总热量为 `520`
+
+### 本次未完成内容
+
+- 安卓端尚未消费 `structuredResult` 做食材级展示
+- 结构化结果中的部分 `识别置信度` 仍可能为空，当前保持尊重模型原始输出，不做强行伪造
+- 仍未完成安卓模拟器或真机端到端手工联调
+
+### 本次暴露的缺陷或偏差
+
+- `GLM-4.6V` 在默认思考模式下超时明显，当前通过关闭 `thinking` 和下调 `max_tokens` 才稳定落入可接受时延
+- 当前 `recognizedItems` 仍是前端主消费字段，`structuredResult` 只是后端已返回，前端尚未接入显示
+
+### 这些缺陷 / 未完成项将在第几步收口
+
+- 下一步若要把食材级信息展示到前端，需要安卓端补 `structuredResult` 的网络模型与页面展示
+- 随后做一次安卓端真实拍照链路手工联调，确认拍照上传、结构化结果展示、保存记录三段一致
+
+### 是否需要更新 spec
+
+- 否
+
+### 备注
+
+- 本轮保持了“少量适配点”原则，没有为了未来平台扩展提前铺设大面积架构
+
+## 2026-04-12 / 主识别模型切换为 GLM-5V-Turbo
+
+### 本次主要完成内容
+
+- 已将智谱主识别模型从 `GLM-4.6V` 切换为 `GLM-5V-Turbo`
+- 调用方式保持不变，继续沿用 `chat/completions + image_url + text` 的图片理解模式
+- 继续保留当前已验证可用的低延迟参数：
+  - `thinking.type = disabled`
+  - `max_tokens = 2048`
+  - `temperature = 0.1`
+  - `timeout-millis = 45000`
+
+### 本次验证结果
+
+- 已重新执行 `powershell -ExecutionPolicy Bypass -File scripts/backend-mvn.ps1 -Dtest=Glm46VAdaptiveRecognitionDemoTest test`
+  - 通过
+- 同一张测试图下，`GLM-5V-Turbo` 主识别耗时约 `23.98s`
+- 结构化结果质量较 `GLM-4.6V` 更细：
+  - 识别出 `藕片 / 午餐肉或火腿片 / 培根或五花肉片 / 蟹棒 / 鱼丸或虾丸 / 牛肉丸 / 金针菇 / 青菜 / 木耳 / 腐竹或豆腐皮 / 油豆腐或豆腐泡`
+  - 同时保留百度 `麻辣烫` 校验结果
+
+### 本次未完成内容
+
+- 尚未把 `GLM-5V-Turbo` 与 `GLM-4.6V` 做更大样本量对比
+- 安卓端仍未展示 `structuredResult`
+
+### 本次暴露的缺陷或偏差
+
+- `GLM-5V-Turbo` 对复杂食材的识别粒度更细，但热量估算明显更激进，当前总估算热量提升到 `1059`
+- 当前仍需要后续通过提示词或前端人工确认机制收口高热量偏保守问题
+
+### 这些缺陷 / 未完成项将在第几步收口
+
+- 下一步如继续保留 `GLM-5V-Turbo`，应补 3 到 5 张真实餐食图做横向样本验证
+- 若模型粒度满意，再进入安卓结构化结果展示和人工确认交互
+
+### 是否需要更新 spec
+
+- 否
+
+### 备注
+
+- 本轮只切换主识别模型，不改变现有适配层结构
+
+## 2026-04-12 / 图片识别外调日志补强
+
+### 本次主要完成内容
+
+- 已为智谱主识别增加详细外调日志：
+  - 请求摘要
+  - 原始响应摘要
+  - 单次请求耗时
+- 已为百度校验增加详细外调日志：
+  - `access_token` 获取请求与响应摘要
+  - 菜品识别请求摘要
+  - 菜品识别响应摘要
+  - token 获取耗时、菜品识别耗时、总耗时
+- 已为识别编排层增加汇总日志：
+  - 整体请求编号
+  - 主 provider / 生效 provider
+  - 候选数
+  - 结构化菜名
+  - 总耗时
+
+### 本次约束说明
+
+- 日志已按“详细但不失控”处理：
+  - 不记录 `API Key / Secret Key`
+  - 不把整张图片的 Base64 原文打入日志
+  - 仅记录图片大小、尺寸、请求参数摘要和响应摘要
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / 智谱切换流式返回验证
+
+### 本次主要完成内容
+
+- 已将智谱主识别调用改为 `stream = true`
+- 已补充流式分片日志，记录每个分片的简要内容
+- 已将智谱耗时日志拆分为：
+  - `firstByteElapsedMs`
+  - `streamReadElapsedMs`
+  - `totalElapsedMs`
+- 已将本次流式联调输出完整落盘到测试日志文件，便于后续人工排查
+
+### 本次验证结果
+
+- 已使用同一张 `tools/picture` 测试图重跑 `GLM-5V-Turbo + 百度校验`
+- 当前流式日志显示：
+  - 智谱首包约 `1.7s`
+  - 智谱流式正文读取约 `8~9s`
+  - 智谱总耗时约 `10.7s`
+  - 百度校验总耗时约 `12.0s`
+  - 编排总耗时约 `22.8s`
+
+### 本次暴露的缺陷或偏差
+
+- 智谱流式输出的分片非常碎，当前一次请求可拆成数百个 chunk，日志量明显变大
+- 如果后续长期保留逐 chunk `INFO` 日志，生产环境日志量会偏大，后续可能需要按环境降级到 `DEBUG`
+
+### 是否需要更新 spec
+
+- 否
+
+## 2026-04-12 / spec 与 AGENTS 文档职责重构
+
+### 本次主要完成内容
+
+- 已重构 `spec.md` 的职责定位：
+  - `spec.md` 只保留项目硬边界与稳定软规范
+  - 不再把项目阶段、完成情况、当前重点、当前未完成等进度信息写入 `spec.md`
+- 已重写 `spec.md` 的软规范内容方向：
+  - 软规范改为记录稳定的工程约束、抽象复用原则、注释日志要求、AI 接入约束
+  - 不再把软规范当作项目进度或当前轮次策略的载体
+- 已微调 `AGENTS.md` 中与 `spec` 相关的执行口径：
+  - 开工顺序改为先读 `spec.md` 的硬边界和软规范，再读 `feature_status.md`
+  - 阶段性策略、试验性方案、临时折中统一写入 `project_develop_log.md`
+  - 只有当规则已沉淀为稳定约束时，才允许更新 `spec.md`
+- 已继续收紧 `spec.md` 的表达：
+  - 合并重叠的硬边界条目，减少针对“如何写 spec”本身的冗余约束
+  - 将 `PO / DTO / VO / BO` 约束从硬边界移回软规范
+  - 弱化多模型接入条目，明确目标是“减少散落、避免过度设计”，而不是强推大而全抽象
+
+### 本次未完成内容
+
+- 未同步清理历史开发日志中早期“soft spec 承载进度”的历史痕迹，本轮只修正文档职责和后续执行口径
+
+### 本次暴露的缺陷或偏差
+
+- 旧版 `spec.md` 的“当前软规范”混入了较多阶段性推进内容，容易把规范文档误用为迭代说明
+- 旧版 `AGENTS.md` 中“通过当前迭代需求重构软规范”的描述，容易诱导在每轮开发时把进度性内容写回 `spec.md`
+
+### 这些缺陷 / 未完成项将在第几步收口
+
+- 后续若继续调整工程规范，只在规则真正稳定后更新 `spec.md`
+- 若只是本轮策略或试验路线变化，统一写入 `project_develop_log.md`
+
+### 是否需要更新 spec
+
+- 是
+
+### 备注
+
+- 本轮是文档治理调整，不涉及业务逻辑、接口契约和项目完成度真值变更
+
+## 2026-04-11 / 百度菜品识别生产接入落地
+
+### 本次主要完成内容
+
+- 已将后端 `app.photo.ai` 配置切换到百度菜品识别：
+  - `provider = baidu`
+  - `token-endpoint = https://aip.baidubce.com/oauth/2.0/token`
+  - `endpoint = https://aip.baidubce.com/rest/2.0/image-classify/v2/dish`
+  - 已写入本轮提供的 `appId / API Key / Secret Key`
+- 已重写 `AdaptivePhotoAiRecognitionClient` 的真实外调逻辑：
+  - 先获取并缓存 `access_token`
+  - 再调用百度菜品识别接口
+  - 将返回的 `name / probability / calorie` 映射到现有候选模型
+  - 调用异常时继续保留本地 fallback，避免主链路直接中断
+- 已补齐百度图片规格兼容：
+  - `AppProperties.Image` 新增 `minDimension = 15`
+  - `PhotoImageProcessingService` 会在最短边小于 `15px` 时先放大到平台可接受范围
+  - `BaiduDishRecognitionDemoTest` 也同步补了最短边兼容，避免 demo 被平台参数校验直接拒绝
+- 已完成验证：
+  - `powershell -ExecutionPolicy Bypass -File scripts/backend-mvn.ps1 -DskipTests compile` 通过
+  - 使用仓库内 `android/app/src/main/assets/sample_meal.png` 和本轮提供的 AK/SK 执行 `BaiduDishRecognitionDemoTest` 成功
+  - 百度接口实际返回 `name = 非菜`，说明鉴权和接口已打通，但当前样例图不是有效餐食图
+- 已补一处前后端契约兜底：
+  - 当百度结果未命中当前 `food_library` 时，后端默认返回 `tagColor = 2`
+  - 避免安卓端 `recognizedItems.tagColor` 非空约束被 `null` 打穿
+
+### 本次未完成内容
+
+- 未拿真实餐食图片验证百度识别业务效果
+- 未完成安卓端真机或模拟器整链路手工联调
+- 未移除 fallback 策略，本轮仍保留兜底能力
+
+### 本次暴露的缺陷或偏差
+
+- 仓库内 `sample_meal.png` 实际是 1x1 占位图，只适合验证接口连通，不适合验证识别准确率
+- 当前生产配置已写入明文 AK/SK，符合本轮要求，但后续若要上线必须改回安全配置
+
+### 这些缺陷 / 未完成项将在第几步收口
+
+- 下一步由你提供真实餐食图片，先跑一次百度 demo，再走安卓拍照上传链路做端到端联调
+- 若业务效果稳定，再视需要决定是否移除 fallback 或把明文凭证迁回环境变量
+
+### 是否需要更新 spec
+
+- 否
+
+### 备注
+
+- 本轮已经完成百度生产接入，不再依赖旧平台 `duijieai`
+
+## 2026-04-11 / 百度菜品识别接入准备确认与 Demo 单测落地
+
+### 本次主要完成内容
+
+- 已确认百度菜品识别接入前置条件：需要百度智能云账号、已创建应用的 `API Key / Secret Key`，正式调用前需先换取 `access_token`
+- 已基于百度官方文档确认关键接口与约束：
+  - `POST https://aip.baidubce.com/oauth/2.0/token` 用于获取 `access_token`
+  - `POST https://aip.baidubce.com/rest/2.0/image-classify/v2/dish` 用于菜品识别
+  - 图片需以 `application/x-www-form-urlencoded` 方式提交，核心参数为 `image`
+- 已新增 `backend/src/test/java/com/dietrecord/backend/BaiduDishRecognitionDemoTest.java`
+  - 只读取环境变量与本地图片路径
+  - 不进入 Spring 容器
+  - 不修改任何生产逻辑
+  - 支持直接提供 `BAIDU_AIP_ACCESS_TOKEN`，也支持通过 `BAIDU_AIP_API_KEY / BAIDU_AIP_SECRET_KEY` 现场换取 token
+- 已完成最小验证：`powershell -ExecutionPolicy Bypass -File scripts/backend-mvn.ps1 -Dtest=BaiduDishRecognitionDemoTest test` 通过，当前因未提供凭证与图片，测试以手动跳过结束
+
+### 本次未完成内容
+
+- 未把生产主链路里的旧平台适配切换到百度
+- 未完成携带真实百度凭证和示例图片的在线识别实调
+- 未改动安卓端拍照上传后的生产识别落点
+
+### 本次暴露的缺陷或偏差
+
+- 当前仓库生产代码仍保留旧平台适配与 fallback 逻辑，百度只完成了 Demo 级联调入口
+- 若后续直接改生产适配，必须先处理好百度 `access_token` 缓存与刷新，而不是每次请求都现场换 token
+
+### 这些缺陷 / 未完成项将在第几步收口
+
+- 下一步先由用户提供百度应用凭证与测试图片，跑通 `BaiduDishRecognitionDemoTest`
+- 确认百度返回契约后，再进入后端生产适配切换与安卓端整链路联调
+
+### 是否需要更新 spec
+
+- 否
+
+### 备注
+
+- 本轮新增的是独立测试 Demo，不是生产能力切换
+
+## 2026-04-11 / 安卓端中文注释与结构日志基线补齐
+
+### 本次主要完成内容
+
+- 已为 Android 应用入口、导航容器、Repository、ViewModel 补充中文结构注释
+- 已在 Android 状态边界层补充关键日志，主要覆盖应用启动、数据加载、拍照识别、目标保存、识别结果保存等链路
+- 已把导航与状态层命名、文案向中文可读性收口，便于 Java 开发快速理解模块职责
+- 已完成 Android `:app:assembleDebug` 构建验证，确认本轮未引入编译错误
+
+### 本次未完成内容
+
+- 未对全部 Compose 页面做深度文案统一，本轮优先覆盖结构层与关键链路
+- 未增加新的日志框架或通用工具类，保持现有 Android 技术栈不变
+
+### 本次暴露的缺陷或偏差
+
+- 部分历史页面文案仍有进一步统一空间，后续若继续收口，需要继续按页面层补齐
+
+### 这些缺陷 / 未完成项将在第几步收口
+
+- 下一步可继续补 Home、Camera、Goal、Recognize 四个页面的中文文案和注释一致性
+
+### 是否需要更新 spec
+
+- 否
+
+### 备注
+
+- 本轮不改文件目录、不改业务逻辑，只补注释、日志和可读性
+
 ## 2026-04-11 / 后端中文注释、日志规范与工具依赖基线补齐
 
 ### 本次主要完成内容

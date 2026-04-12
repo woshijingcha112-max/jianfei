@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:mysql://192.168.72.59:3306/dev_cse_finance?characterEncoding=UTF-8&useUnicode=true&useSSL=false&tinyInt1isBit=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
-    username: cse_dev
-    password: replace_me
+    url: jdbc:mysql://127.0.0.1:3306/dev_cse_finance?characterEncoding=UTF-8&useUnicode=true&useSSL=false&tinyInt1isBit=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    username: root
+    password:
 
 app:
   storage:
@@ -10,14 +10,30 @@ app:
     access-prefix: /uploads
   photo:
     image:
+      min-dimension: 15
       preserve-max-bytes: 1200000
       compressed-target-max-bytes: 900000
       max-dimension: 1920
       jpeg-quality: 0.88
     ai:
-      enabled: false
-      provider: duijieai
-      endpoint: https://replace-with-duijieai-endpoint
-      api-key: replace_me
-      model: replace_me
-      timeout-millis: 8000
+      enabled: true
+      provider: zhipu
+      timeout-millis: 45000
+      default-meal-type: 待确认
+      baidu:
+        enabled: false
+        app-id: replace_me
+        token-endpoint: https://aip.baidubce.com/oauth/2.0/token
+        endpoint: https://aip.baidubce.com/rest/2.0/image-classify/v2/dish
+        api-key: replace_me
+        secret-key: replace_me
+        top-num: 5
+        baike-num: 1
+        token-refresh-before-seconds: 300
+      zhipu:
+        enabled: true
+        endpoint: https://open.bigmodel.cn/api/paas/v4/chat/completions
+        api-key: replace_me
+        model: glm-5v-turbo
+        max-tokens: 2048
+        temperature: 0.1

@@ -4,8 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dietrecord.backend.modules.food.mapper.FoodLibraryMapper;
 import com.dietrecord.backend.modules.food.model.po.FoodLibraryPO;
 import com.dietrecord.backend.modules.photo.model.internal.PhotoAiRecognitionCandidate;
+import com.dietrecord.backend.modules.photo.model.internal.PhotoAiRecognitionResult;
+import com.dietrecord.backend.modules.photo.model.internal.PhotoRecognitionOutcome;
 import com.dietrecord.backend.modules.photo.model.internal.ProcessedPhoto;
 import com.dietrecord.backend.modules.photo.model.vo.PhotoRecognitionItemVO;
+import com.dietrecord.backend.modules.photo.model.vo.PhotoStructuredResultVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -36,12 +39,13 @@ public class PhotoRecognitionService {
         this.foodLibraryMapper = foodLibraryMapper;
     }
 
-    public List<PhotoRecognitionItemVO> recognize(ProcessedPhoto processedPhoto) {
+    public PhotoRecognitionOutcome recognize(ProcessedPhoto processedPhoto, String photoUrl) {
         log.info("开始组装图片识别结果，文件名={}，图片指纹={}",
                 processedPhoto.originalFilename(), processedPhoto.sha256());
 
         // 先获取 AI 候选项，再读取食物库用于标准化匹配。
-        List<PhotoAiRecognitionCandidate> candidates = photoAiRecognitionClient.recognize(processedPhoto);
+        PhotoAiRecognitionResult recognitionResult = photoAiRecognitionClient.recognize(processedPhoto, photoUrl);
+        List<PhotoAiRecognitionCandidate> candidates = recognitionResult.candidates();
         List<FoodLibraryPO> foods = foodLibraryMapper.selectList(
                 new LambdaQueryWrapper<FoodLibraryPO>().orderByAsc(FoodLibraryPO::getId));
 
@@ -58,23 +62,13 @@ public class PhotoRecognitionService {
         items.sort(Comparator.comparing(PhotoRecognitionItemVO::getConfidence,
                 Comparator.nullsLast(Comparator.reverseOrder())));
 
-        log.info("图片识别结果组装完成，文件名={}，候选数={}，返回数={}",
-                processedPhoto.originalFilename(), candidates.size(), items.size());
-        return items;
-    }
-
-    public List<PhotoRecognitionItemVO> recognize(String sourceFilename) {
-        ProcessedPhoto fallbackPhoto = new ProcessedPhoto(
-                new byte[0],
-                sourceFilename,
-                "image/jpeg",
-                "jpg",
-                false,
-                0,
-                0,
-                0,
-                sourceFilename == null ? UUID.randomUUID().toString() : sourceFilename);
-        return recognize(fallbackPhoto);
+        log.info("图片识别结果组装完成，文件名={}，候选数={}，返回数={}，structuredDish={}，structuredIngredients={}",
+                processedPhoto.originalFilename(),
+                candidates.size(),
+                items.size(),
+                extractStructuredDishName(recognitionResult),
+                extractStructuredIngredientCount(recognitionResult));
+        return new PhotoRecognitionOutcome(items, recognitionResult.structuredResult());
     }
 
     private PhotoRecognitionItemVO toItem(PhotoAiRecognitionCandidate candidate, List<FoodLibraryPO> foods, int rank) {
@@ -107,7 +101,7 @@ public class PhotoRecognitionService {
         BigDecimal calories = candidate.calories() != null
                 ? candidate.calories().setScale(1, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
-        Integer tagColor = candidate.tagColor();
+        Integer tagColor = candidate.tagColor() != null ? candidate.tagColor() : 2;
         return new PhotoRecognitionItemVO(
                 buildTempId(rank, null, candidate.foodName()),
                 null,
@@ -147,7 +141,7 @@ public class PhotoRecognitionService {
         }
 
         if (StringUtils.hasText(food.getAlias())) {
-            for (String alias : food.getAlias().split("[,，]")) {
+            for (String alias : food.getAlias().split("[,，、]")) {
                 String normalizedAlias = normalizeText(alias);
                 if (StringUtils.hasText(normalizedAlias) && normalizedCandidate.contains(normalizedAlias)) {
                     score += 80;
@@ -192,6 +186,25 @@ public class PhotoRecognitionService {
         String base = (foodId == null ? "unknown" : foodId.toString()) + "-" + rank + "-"
                 + Objects.toString(foodName, "null");
         return "tmp-" + UUID.nameUUIDFromBytes(base.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String extractStructuredDishName(PhotoAiRecognitionResult recognitionResult) {
+        if (recognitionResult == null || recognitionResult.structuredResult() == null
+                || recognitionResult.structuredResult().recognitionPayload() == null) {
+            return "";
+        }
+        PhotoStructuredResultVO.WholeDishInfo wholeDishInfo =
+                recognitionResult.structuredResult().recognitionPayload().wholeDishInfo();
+        return wholeDishInfo == null ? "" : wholeDishInfo.dishName();
+    }
+
+    private int extractStructuredIngredientCount(PhotoAiRecognitionResult recognitionResult) {
+        if (recognitionResult == null || recognitionResult.structuredResult() == null
+                || recognitionResult.structuredResult().recognitionPayload() == null
+                || recognitionResult.structuredResult().recognitionPayload().ingredientDetails() == null) {
+            return 0;
+        }
+        return recognitionResult.structuredResult().recognitionPayload().ingredientDetails().size();
     }
 
     private record FoodMatch(FoodLibraryPO food, int score) {

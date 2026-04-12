@@ -11,6 +11,10 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 public class GoalSaveDTO {
 
+    @NotNull(message = "currentWeight is required")
+    @Positive(message = "currentWeight must be positive")
+    private BigDecimal currentWeight;
+
     @NotNull(message = "targetWeight is required")
     @Positive(message = "targetWeight must be positive")
     private BigDecimal targetWeight;

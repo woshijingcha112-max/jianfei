@@ -63,10 +63,19 @@ public class AppProperties {
 
     public static class Image {
 
+        private int minDimension = 15;
         private long preserveMaxBytes = 1_200_000L;
         private long compressedTargetMaxBytes = 900_000L;
         private int maxDimension = 1920;
         private double jpegQuality = 0.88d;
+
+        public int getMinDimension() {
+            return minDimension;
+        }
+
+        public void setMinDimension(int minDimension) {
+            this.minDimension = minDimension;
+        }
 
         public long getPreserveMaxBytes() {
             return preserveMaxBytes;
@@ -104,11 +113,11 @@ public class AppProperties {
     public static class Ai {
 
         private boolean enabled = false;
-        private String provider = "duijieai";
-        private String endpoint = "https://replace-with-duijieai-endpoint";
-        private String apiKey = "";
-        private String model = "replace-me";
-        private int timeoutMillis = 8_000;
+        private String provider = "zhipu";
+        private int timeoutMillis = 45_000;
+        private String defaultMealType = "待确认";
+        private final Baidu baidu = new Baidu();
+        private final Zhipu zhipu = new Zhipu();
 
         public boolean isEnabled() {
             return enabled;
@@ -124,6 +133,134 @@ public class AppProperties {
 
         public void setProvider(String provider) {
             this.provider = provider;
+        }
+
+        public int getTimeoutMillis() {
+            return timeoutMillis;
+        }
+
+        public void setTimeoutMillis(int timeoutMillis) {
+            this.timeoutMillis = timeoutMillis;
+        }
+
+        public String getDefaultMealType() {
+            return defaultMealType;
+        }
+
+        public void setDefaultMealType(String defaultMealType) {
+            this.defaultMealType = defaultMealType;
+        }
+
+        public Baidu getBaidu() {
+            return baidu;
+        }
+
+        public Zhipu getZhipu() {
+            return zhipu;
+        }
+    }
+
+    public static class Baidu {
+
+        private boolean enabled = true;
+        private String appId = "";
+        private String tokenEndpoint = "https://aip.baidubce.com/oauth/2.0/token";
+        private String endpoint = "https://aip.baidubce.com/rest/2.0/image-classify/v2/dish";
+        private String apiKey = "";
+        private String secretKey = "";
+        private int topNum = 5;
+        private int baikeNum = 1;
+        private int tokenRefreshBeforeSeconds = 300;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getAppId() {
+            return appId;
+        }
+
+        public void setAppId(String appId) {
+            this.appId = appId;
+        }
+
+        public String getTokenEndpoint() {
+            return tokenEndpoint;
+        }
+
+        public void setTokenEndpoint(String tokenEndpoint) {
+            this.tokenEndpoint = tokenEndpoint;
+        }
+
+        public String getEndpoint() {
+            return endpoint;
+        }
+
+        public void setEndpoint(String endpoint) {
+            this.endpoint = endpoint;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        public String getSecretKey() {
+            return secretKey;
+        }
+
+        public void setSecretKey(String secretKey) {
+            this.secretKey = secretKey;
+        }
+
+        public int getTopNum() {
+            return topNum;
+        }
+
+        public void setTopNum(int topNum) {
+            this.topNum = topNum;
+        }
+
+        public int getBaikeNum() {
+            return baikeNum;
+        }
+
+        public void setBaikeNum(int baikeNum) {
+            this.baikeNum = baikeNum;
+        }
+
+        public int getTokenRefreshBeforeSeconds() {
+            return tokenRefreshBeforeSeconds;
+        }
+
+        public void setTokenRefreshBeforeSeconds(int tokenRefreshBeforeSeconds) {
+            this.tokenRefreshBeforeSeconds = tokenRefreshBeforeSeconds;
+        }
+    }
+
+    public static class Zhipu {
+
+        private boolean enabled = true;
+        private String endpoint = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+        private String apiKey = "";
+        private String model = "glm-5v-turbo";
+        private int maxTokens = 2048;
+        private double temperature = 0.1d;
+        private String prompt = "";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
         }
 
         public String getEndpoint() {
@@ -150,12 +287,28 @@ public class AppProperties {
             this.model = model;
         }
 
-        public int getTimeoutMillis() {
-            return timeoutMillis;
+        public int getMaxTokens() {
+            return maxTokens;
         }
 
-        public void setTimeoutMillis(int timeoutMillis) {
-            this.timeoutMillis = timeoutMillis;
+        public void setMaxTokens(int maxTokens) {
+            this.maxTokens = maxTokens;
+        }
+
+        public double getTemperature() {
+            return temperature;
+        }
+
+        public void setTemperature(double temperature) {
+            this.temperature = temperature;
+        }
+
+        public String getPrompt() {
+            return prompt;
+        }
+
+        public void setPrompt(String prompt) {
+            this.prompt = prompt;
         }
     }
 }
