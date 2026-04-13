@@ -9,7 +9,9 @@ import java.util.List;
  * 识别结果页输出模型。
  */
 public record PhotoRecognitionOutcome(
+        /** 扁平识别结果列表 */
         List<PhotoRecognitionItemVO> recognizedItems,
+        /** 结构化识别结果 */
         PhotoStructuredResultVO structuredResult
 ) {
 

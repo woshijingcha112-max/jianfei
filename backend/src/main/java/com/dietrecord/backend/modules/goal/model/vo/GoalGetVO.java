@@ -11,9 +11,12 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class GoalGetVO {
 
+    /** 当前体重 */
     private BigDecimal currentWeightKg;
 
+    /** 目标体重 */
     private BigDecimal targetWeightKg;
 
+    /** 每日热量上限 */
     private Integer dailyCalorieLimit;
 }

@@ -1,9 +1,17 @@
 package com.dietrecord.backend.common.api;
 
+import lombok.Data;
+
+@Data
 public class ApiResponse<T> {
 
+    /** 响应码 */
     private final int code;
+
+    /** 响应消息 */
     private final String msg;
+
+    /** 响应数据 */
     private final T data;
 
     private ApiResponse(int code, String msg, T data) {
@@ -24,15 +32,4 @@ public class ApiResponse<T> {
         return new ApiResponse<>(code, msg, null);
     }
 
-    public int getCode() {
-        return code;
-    }
-
-    public String getMsg() {
-        return msg;
-    }
-
-    public T getData() {
-        return data;
-    }
 }

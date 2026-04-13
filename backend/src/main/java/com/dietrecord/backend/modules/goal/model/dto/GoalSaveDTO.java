@@ -11,14 +11,17 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 public class GoalSaveDTO {
 
+    /** 当前体重 */
     @NotNull(message = "currentWeight is required")
     @Positive(message = "currentWeight must be positive")
     private BigDecimal currentWeight;
 
+    /** 目标体重 */
     @NotNull(message = "targetWeight is required")
     @Positive(message = "targetWeight must be positive")
     private BigDecimal targetWeight;
 
+    /** 每日热量上限 */
     @NotNull(message = "dailyCalLimit is required")
     @Positive(message = "dailyCalLimit must be positive")
     private Integer dailyCalLimit;

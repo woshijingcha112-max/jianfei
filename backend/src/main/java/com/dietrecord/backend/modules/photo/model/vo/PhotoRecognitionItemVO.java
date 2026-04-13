@@ -1,17 +1,37 @@
 package com.dietrecord.backend.modules.photo.model.vo;
 
+import lombok.Data;
+
 import java.math.BigDecimal;
 
+@Data
 public class PhotoRecognitionItemVO {
 
+    /** 临时条目标识 */
     private final String tempId;
+
+    /** 食物库主键 */
     private final Long foodId;
+
+    /** 食物名称 */
     private final String foodName;
+
+    /** 估算热量 */
     private final BigDecimal calories;
+
+    /** 标签颜色等级 */
     private final Integer tagColor;
+
+    /** 是否命中食物库 */
     private final Boolean matched;
+
+    /** 识别置信度 */
     private final BigDecimal confidence;
+
+    /** 估算重量克数 */
     private final BigDecimal weightG;
+
+    /** 是否已人工确认 */
     private final Boolean isConfirmed;
 
     public PhotoRecognitionItemVO(String tempId, Long foodId, String foodName, BigDecimal calories, Integer tagColor,
@@ -27,39 +47,4 @@ public class PhotoRecognitionItemVO {
         this.isConfirmed = isConfirmed;
     }
 
-    public String getTempId() {
-        return tempId;
-    }
-
-    public Long getFoodId() {
-        return foodId;
-    }
-
-    public String getFoodName() {
-        return foodName;
-    }
-
-    public BigDecimal getCalories() {
-        return calories;
-    }
-
-    public Integer getTagColor() {
-        return tagColor;
-    }
-
-    public Boolean getMatched() {
-        return matched;
-    }
-
-    public BigDecimal getConfidence() {
-        return confidence;
-    }
-
-    public BigDecimal getWeightG() {
-        return weightG;
-    }
-
-    public Boolean getIsConfirmed() {
-        return isConfirmed;
-    }
 }

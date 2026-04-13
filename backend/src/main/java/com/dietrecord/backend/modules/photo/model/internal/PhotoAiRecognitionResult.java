@@ -8,7 +8,9 @@ import java.util.List;
  * 图片识别统一输出。
  */
 public record PhotoAiRecognitionResult(
+        /** 候选识别结果 */
         List<PhotoAiRecognitionCandidate> candidates,
+        /** 结构化识别结果 */
         PhotoStructuredResultVO structuredResult
 ) {
 
