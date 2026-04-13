@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,13 +29,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dietrecord.app.core.model.RecognizedFoodUiModel
 import com.dietrecord.app.core.ui.components.AppAccentBadge
-import com.dietrecord.app.core.ui.components.AppPageHeader
 import com.dietrecord.app.core.ui.components.AppRoundIconBadge
 import com.dietrecord.app.core.ui.components.AppSectionCard
-import com.dietrecord.app.core.ui.components.InlineFeedback
 import com.dietrecord.app.core.ui.components.MetricRow
 import com.dietrecord.app.core.ui.components.TagBadge
 import com.dietrecord.app.core.ui.theme.BlossomPink
@@ -43,6 +43,7 @@ import com.dietrecord.app.core.ui.theme.CocoaBrown
 import com.dietrecord.app.core.ui.theme.CreamWhite
 import com.dietrecord.app.core.ui.theme.ErrorRose
 import com.dietrecord.app.core.ui.theme.PetalPink
+import com.dietrecord.app.core.ui.theme.RibbonPink
 import com.dietrecord.app.core.ui.theme.StrawberryRed
 import com.dietrecord.app.core.ui.theme.SuccessMint
 
@@ -63,6 +64,32 @@ fun RecognizeResultScreen(
 
     val showRecognitionLoading =
         isRecognitionPending && uiState.items.isEmpty() && recognitionErrorMessage == null
+    val showEmptyAsError =
+        !isRecognitionPending &&
+            recognitionErrorMessage == null &&
+            uiState.errorMessage == null &&
+            uiState.items.isEmpty()
+    val summaryErrorMessage = recognitionErrorMessage ?: uiState.errorMessage
+    val summaryBadgeText = when {
+        showRecognitionLoading -> "识别中"
+        summaryErrorMessage != null || showEmptyAsError -> "识别错误"
+        else -> "${uiState.items.size}项"
+    }
+    val summaryMessageText = when {
+        summaryErrorMessage != null -> summaryErrorMessage
+        showEmptyAsError -> "这不是可以吃的东西喔~"
+        else -> null
+    }
+    val summaryCountValue = when {
+        showRecognitionLoading -> "--"
+        summaryErrorMessage != null && uiState.items.isEmpty() -> "--"
+        else -> "${uiState.items.size}"
+    }
+    val summaryCaloriesValue = when {
+        showRecognitionLoading -> "--"
+        summaryErrorMessage != null && uiState.items.isEmpty() -> "--"
+        else -> "${uiState.totalCalories} kcal"
+    }
     val saveEnabled = uiState.items.isNotEmpty() && !uiState.isSaving && !showRecognitionLoading
     val retakeEnabled = !isRecognitionPending && !uiState.isSaving
 
@@ -79,55 +106,23 @@ fun RecognizeResultScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                AppPageHeader(
-                    title = "识别结果",
-                    subtitle = "本次拍照已提交识别，后端返回后会在这里更新内容。",
-                    badgeText = when {
-                        showRecognitionLoading -> "识别中"
-                        uiState.items.isEmpty() -> "空结果"
-                        else -> "${uiState.items.size} 项"
-                    }
-                )
-            }
-
-            if (recognitionErrorMessage != null) {
-                item {
-                    InlineFeedback(message = recognitionErrorMessage, isError = true)
-                }
-            }
-            if (uiState.errorMessage != null) {
-                item {
-                    InlineFeedback(message = uiState.errorMessage, isError = true)
-                }
-            }
-            if (showRecognitionLoading) {
-                item {
-                    InlineFeedback(message = "图片已提交，正在等待后端识别结果。", isError = false)
-                }
-            }
-
-            item {
-                AppSectionCard(
-                    eyebrow = "识别汇总",
-                    title = "保存前确认当前结果"
-                ) {
+                AppSectionCard {
+                    SummaryHeader(badgeText = summaryBadgeText)
                     MetricRow(
                         label = "识别项目数",
-                        value = if (showRecognitionLoading) "--" else "${uiState.items.size}"
+                        value = summaryCountValue
                     )
                     MetricRow(
                         label = "预计热量",
-                        value = if (showRecognitionLoading) "--" else "${uiState.totalCalories} kcal"
+                        value = summaryCaloriesValue
                     )
-                    Text(
-                        text = when {
-                            showRecognitionLoading -> "正在异步等待后端返回，明细区先显示占位。"
-                            recognitionErrorMessage != null -> "本次识别失败，可以直接重新拍照。"
-                            else -> "确认无误后可直接保存到今日饮食记录。"
-                        },
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = CocoaBrown.copy(alpha = 0.72f)
-                    )
+                    if (summaryMessageText != null) {
+                        Text(
+                            text = summaryMessageText,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = CocoaBrown.copy(alpha = 0.72f)
+                        )
+                    }
                 }
             }
 
@@ -135,20 +130,7 @@ fun RecognizeResultScreen(
                 item {
                     RecognitionLoadingSection()
                 }
-            } else if (uiState.items.isEmpty()) {
-                item {
-                    AppSectionCard(
-                        eyebrow = "暂无结果",
-                        title = "当前还没有可保存的识别明细"
-                    ) {
-                        Text(
-                            text = "可以重新拍照，或等待后端继续返回。",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = CocoaBrown.copy(alpha = 0.72f)
-                        )
-                    }
-                }
-            } else {
+            } else if (uiState.items.isNotEmpty()) {
                 itemsIndexed(uiState.items, key = { _, item -> item.id }) { index, item ->
                     RecognizeItemCard(index = index, item = item)
                 }
@@ -165,6 +147,30 @@ fun RecognizeResultScreen(
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = 16.dp, vertical = 14.dp)
         )
+    }
+}
+
+@Composable
+private fun SummaryHeader(badgeText: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "识别汇总",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = CocoaBrown
+            )
+            AppAccentBadge(
+                text = badgeText,
+                containerColor = CreamWhite.copy(alpha = 0.92f),
+                contentColor = BlossomPink
+            )
+        }
+        HorizontalDivider(color = RibbonPink.copy(alpha = 0.45f))
     }
 }
 
@@ -233,7 +239,27 @@ private fun RecognizeFloatingActions(
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 14.dp)
             ) {
                 Text(
-                    text = "重新拍照",
+                    text = "重拍",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+
+            Button(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PetalPink.copy(alpha = 0.72f),
+                    contentColor = BlossomPink,
+                    disabledContainerColor = PetalPink.copy(alpha = 0.42f),
+                    disabledContentColor = BlossomPink.copy(alpha = 0.48f)
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 14.dp)
+            ) {
+                Text(
+                    text = "编辑",
                     style = MaterialTheme.typography.titleMedium
                 )
             }
