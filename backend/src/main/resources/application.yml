@@ -58,7 +58,7 @@ app:
       zhipu:
         enabled: true
         endpoint: https://open.bigmodel.cn/api/paas/v4/chat/completions
-        api-key: "ded00c9507084f6c82fdfbe057054de3.CHRB4xtDYPZDStp8"
+        api-key: ${PHOTO_AI_ZHIPU_API_KEY:}
         model: glm-4.6v
         max-tokens: 2048
         temperature: 0.1
